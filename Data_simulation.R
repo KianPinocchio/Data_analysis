@@ -4,7 +4,7 @@
 #   for the simulated data based on data from an existing study.
 # I will be using the approach outlined here https://github.com/kekecsz/Simulation_based_power_analysis.git
 
-## The outcome (CES-D-5) in study (Troy et al., 2017) had the following  properties: (M = 3.46, SD = 3.34, alpha =.81)
+## The outcome (CES-D-5) in Study 1 (Troy et al., 2017) had the following  properties: (M = 3.46, SD = 3.34, alpha =.81)
 # In addition the study reports total number of participants (N_total) 
 # and the regression coefficients of all variables needed to simulate data and 
 # estimate the error of the outcome variable.
