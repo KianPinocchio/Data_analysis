@@ -2,13 +2,14 @@
 ## Objectives:
 ## 1.To decide on an appropriate Standard Deviation of Error 
 #   for the simulated data based on data from an existing study.
-#   I will be using the approach outlined here https://github.com/kekecsz/Simulation_based_power_analysis.git
 # 
 # 2. Use the estimated SD to simulate the data and run a simulation based Power Analysis
 ## The outcome (CES-D-5) in Study 1 (Troy et al., 2017) had the following  properties: (M = 3.46, SD = 3.34, alpha =.81)
 # In addition the study reports total number of participants (N_total) 
 # and the regression coefficients of all variables needed to simulate data and 
 # estimate the error of the outcome variable.
+
+#   I will be using the approach outlined here https://github.com/kekecsz/Simulation_based_power_analysis.git
 
 ## Reference: Troy, A. S., Ford, B. Q., McRae, K., Zarolia, P., & Mauss, I. B. (2017). 
 #   Change the things you can: Emotion regulation is more beneficial for people from lower than from higher socioeconomic status. 
