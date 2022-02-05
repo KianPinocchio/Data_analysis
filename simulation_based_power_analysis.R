@@ -39,40 +39,6 @@ data_simulation_function <- function(N_total,
   PSS = rtruncnorm(n = N_total, a=1, b=5, mean = 2.70, sd = 0.9)
   PSS = round(PSS)
   
-  # # Replication study data
-  # replication_data = data.frame(outcome = outcome,
-  #                             CRA = CRA,
-  #                             SES = SES,
-  #                             PSS = PSS)
-  # 
-  # # Simulate Meta-cognitive questionnaire data based on Estimation based on Tajrishi (2011)
-  # mcq_pos = rtruncnorm(n = N_total, a=6, b=24, mean = 11.80 , sd = 4.29) # Positive beliefs about worry
-  # mcq_pos = round(mcq_pos)
-  # 
-  # mcq_neg = rtruncnorm(n = N_total, a=6, b=24, mean = 13.30 , sd = 4.04) # negative beliefs about uncontrolability of worry
-  # mcq_neg = round(mcq_neg)
-  # 
-  # mcq_cc = rtruncnorm(n = N_total, a=6, b=24, mean = 11.50, sd = 3.98)
-  # mcq_cc = round(mcq_cc)
-  # 
-  # mcq_nc = rtruncnorm(n = N_total, a=6, b=24, mean = 15.70, sd = 3.49)
-  # mcq_nc = round(mcq_nc)
-  # 
-  # mcq_csc = rtruncnorm(n = N_total, a=6, b=24, mean = 16.00, sd = 4.00)
-  # mcq_csc = round(mcq_csc)
-  # 
-  # extension_study_data <- data.frame(mcq_pos = mcq_pos,
-  #                                     mcq_neg = mcq_neg,
-  #                                     mcq_cc = mcq_cc,
-  #                                     mcq_nc = mcq_nc,
-  #                                     mcq_csc = mcq_csc)
-  # 
-  # mcq_t <- apply(extension_study_data,1,mean)
-  # 
-  # # Simulate Beliefs about Social Mobility (BSM) data.
-  # bsm = rtruncnorm(n = N_total, a=1, b=7, mean = 4 , sd = 1)
-  # bsm = round(bsm)
-  # 
   #error
   error = rnorm(n = N_total, m = 0, sd = sd_error)
   
@@ -86,24 +52,58 @@ data_simulation_function <- function(N_total,
                PSS*PSS_coefficient + 
                error)
   
-  # Storing all simualted data together
-  simulated_data = data.frame(outcome = outcome,
+  # # Replication study data
+  replication_data = data.frame(outcome = outcome,
                               CRA = CRA,
                               SES = SES,
                               PSS = PSS)
+
+  # # Simulate Meta-cognitive questionnaire data based on Estimation based on Tajrishi (2011)
+  mcq_pos = rtruncnorm(n = N_total, a=6, b=24, mean = 11.80 , sd = 4.29) # Positive beliefs about worry
+  mcq_pos = round(mcq_pos)
+
+  mcq_neg = rtruncnorm(n = N_total, a=6, b=24, mean = 13.30 , sd = 4.04) # negative beliefs about uncontrolability of worry
+  mcq_neg = round(mcq_neg)
+
+  mcq_cc = rtruncnorm(n = N_total, a=6, b=24, mean = 11.50, sd = 3.98)
+  mcq_cc = round(mcq_cc)
+
+  mcq_nc = rtruncnorm(n = N_total, a=6, b=24, mean = 15.70, sd = 3.49)
+  mcq_nc = round(mcq_nc)
+
+  mcq_csc = rtruncnorm(n = N_total, a=6, b=24, mean = 16.00, sd = 4.00)
+  mcq_csc = round(mcq_csc)
+
+  extension_study_data <- data.frame(mcq_pos = mcq_pos,
+                                      mcq_neg = mcq_neg,
+                                      mcq_cc = mcq_cc,
+                                      mcq_nc = mcq_nc,
+                                      mcq_csc = mcq_csc)
+
+  # Simulate Beliefs about Social Mobility (BSM) data.
+  bsm = rtruncnorm(n = N_total, a=1, b=7, mean = 4 , sd = 1)
+  bsm = round(bsm)
+  
+  extension_study_data$mcq_t <- apply(extension_study_data,1,mean) #scoring mcq scale
+  
+  extension_study_data$bsm <- bsm # adding the bsm score to the dataframe
+  
+  # Storing all simualted data together
+  simulated_data = cbind(replication_data, extension_study_data)
+  
   
   return(simulated_data) }
 
-## Here we replicate the simulation function a high number of times
-#   to get a large sample of various Standard Deviations of our
-#   simulations
-error_simulation_function <- function(N_total, 
-                                               CRA_coefficient,
-                                               SES_coefficient,
-                                               PSS_coefficient,
-                                               int_coefficient,
-                                               sd_error,
-                                               nr_iterations){
+
+## Here we replicate the simulation function many times
+#   to get a large sample of various Standard Deviations of our simulations
+error_simulation <- function(N_total, 
+                             CRA_coefficient,
+                             SES_coefficient,
+                             PSS_coefficient,
+                             int_coefficient,
+                             sd_error,
+                             nr_iterations){
   
   # replicate the simulation function
   data = data.frame(replicate( n = nr_iterations,
@@ -131,26 +131,47 @@ error_simulation_function <- function(N_total,
   return(outcome)
 }
 
-# create an array of standard deviations of all the outcomes that we simulated
-all_outcome_observations_SD = error_simulation_function(N_total = 301,
-                                                        CRA_coefficient = -0.15,
-                                                        SES_coefficient = -0.03,
-                                                        PSS_coefficient = 0.53,
-                                                        int_coefficient = 0.09,
-                                                        sd_error = 3, # Standard Deviation of error
-                                                        nr_iterations = 100)
-## summarise our results: We are looking for a Mean close to the 
-#  Standard Deviation of the outcome reported by the study (SD = 3.34)
-summary(all_outcome_observations_SD)
+# visualise the standard deviation of all the simulated outcomes to decide 
+# on the best estimate of error's standard deviation
+sd_of_error_estimation <- function(N_total,
+                                   CRA_coefficient,
+                                   SES_coefficient,
+                                   PSS_coefficient,
+                                   int_coefficient,
+                                   sd_error, # Standard Deviation of error
+                                   nr_iterations){
+  
+  all_outcome_observations_SD = error_simulation(N_total,
+                                                 CRA_coefficient,
+                                                 SES_coefficient,
+                                                 PSS_coefficient,
+                                                 int_coefficient,
+                                                 sd_error,
+                                                 nr_iterations)
+  
+  ## summarise our results: We are looking for a Mean close to the 
+  #  Standard Deviation of the outcome reported by the study (SD = 3.34)
+  print(summary(all_outcome_observations_SD))
+  
+  # visualise all observations.
+  hist(all_outcome_observations_SD, main = "outcomes' standard deviations")
+}
 
-# visualise all observations.
-hist(all_outcome_observations_SD)
+
+sd_of_error_estimation(N_total = 301,
+                       CRA_coefficient = -0.15,
+                       SES_coefficient = -0.03,
+                       PSS_coefficient = 0.53,
+                       int_coefficient = 0.09,
+                       sd_error = 3,
+                       nr_iterations = 100)
+
 
 #### Regression Analysis ####
 # Using the estimated SD (SD = 3) we run a simulation based power analysis below
 # Model is based on the study: entering all IVs at the same time
-analysis_function_regression <- function(data){ 
-  regression = lm(outcome ~ PSS + CRA + SES + CRA:SES, data = data)
+regression_analysis <- function(data){ 
+  regression = lm(outcome ~ PSS + CRA + SES+ CRA:SES, data = data)
   p_value = summary(regression)$coefficients[2,4]
   
   decision = if(p_value < 0.05){"H1"} else {"Inconclusive"}
@@ -172,18 +193,18 @@ analysis_and_simulation_function <- function(N_total,
                                             int_coefficient,
                                             sd_error)
   
-  decision = analysis_function_regression(data = simulated_data)
+  decision = regression_analysis(data = simulated_data)
   
   return(decision)
 }
 
 # Number of times we iterate the Simulation and Analysis
-number_iterations = 100
+number_iterations = 1000
 
 ## Iterate all functions
 ## Save all H1 accepted results
 all_decisions = replicate(n = number_iterations, 
-                          analysis_and_simulation_function(N_total = 300, 
+                          analysis_and_simulation_function(N_total = 400, 
                                                             CRA_coefficient = -0.15,
                                                             SES_coefficient = -0.03,
                                                             PSS_coefficient = 0.53,
