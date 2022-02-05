@@ -112,13 +112,12 @@ sample_data_function = function(N_total){
   
   return(all_data)}
 
-simualted_data = sample_data_function(N_total = 300)
 #### Descriptives ####
 # means, sd, min, max
 # In the first step, the data are summarized to get the descriptive statistics.
 # Subsequently, the data are reformatted. 
 
-  
+
 descriptive_function = function(scored_data){ 
   
   descriptives <- scored_data %>% 
