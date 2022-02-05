@@ -4,7 +4,7 @@
 
 set.seed(1)
 # install packages ###########################
-pacman::p_load(pacman, caret, lars, tidyverse, MASS, truncnorm, Runran,
+pacman::p_load(pacman, caret, lars, tidyverse, MASS, truncnorm, Runuran,
                kableExtra,
                psych,
                janitor,
@@ -34,6 +34,17 @@ sample_data_function = function(N_total){
   ## turn gender into factor for regression
   participant_gender = as.factor(participant_gender)
   
+  # Socioeconomic Status (ses)
+  # Based on the data provided in the study
+  ses = rtruncnorm(n = N_total, a=1, b=12, mean = 5.27, sd = 3.06)
+  ses = round(ses)
+  
+  #combine demographics
+  demographics <- data.frame(nr = participant_number,
+                             age= participant_age,
+                             gender = participant_gender,
+                             ses = ses)
+  
   # cognitive reappraisal ability (CRA)
   cra <- data.frame(cra_1 = sample(1:7, N_total, replace = TRUE),
                     cra_2 = sample(1:7, N_total, replace = TRUE),
@@ -43,11 +54,6 @@ sample_data_function = function(N_total){
                     cra_6 = sample(1:7, N_total, replace = TRUE),
                     cra_7 = sample(1:7, N_total, replace = TRUE),
                     cra_8 = sample(1:7, N_total, replace = TRUE))
-  
-  # Socioeconomic Status (ses)
-  # Based on the data provided in the study
-  ses = rtruncnorm(n = N_total, a=1, b=12, mean = 5.27, sd = 3.06)
-  ses = round(ses)
   
   #Habitual Cognitive Reappraisal Use  (hcru)
   hcru <- data.frame(hcru_1 = sample(1:7, N_total, replace = TRUE),
@@ -71,83 +77,47 @@ sample_data_function = function(N_total){
                      cesd_5 = sample(0:3, N_total, replace = TRUE))
   
   # Meta-cognitions questionnaire-30 (MCQ-30 30-items)
-  cra <- data.frame(cra_1 = sample(1:7, N_total, replace = TRUE),
-                    cra_2 = sample(1:7, N_total, replace = TRUE),
-                    cra_3 = sample(1:7, N_total, replace = TRUE),
-                    cra_4 = sample(1:7, N_total, replace = TRUE),
-                    cra_5 = sample(1:7, N_total, replace = TRUE),
-                    cra_6 = sample(1:7, N_total, replace = TRUE),
-                    cra_7 = sample(1:7, N_total, replace = TRUE),
-                    cra_8 = sample(1:7, N_total, replace = TRUE))
+  mcq_question_numbers = 30
+  
+  # Simulate data for 30 mcq scale questions
+  mcq = data.frame(replicate(n = mcq_question_numbers,
+                        sample(1:7, N_total, replace = TRUE)))
+  
+  # Create 30 variable (question) titles: mcq_1 to mcq_30 with a for loop
+  column_name_list = NULL # where we store new variable names
+  
+  for (index in 1 : mcq_question_numbers){ 
+    column_name = paste(c("mcq_",as.character(index)),collapse='')
+    column_name_list <- append(column_name_list, column_name)
+    #i <- i+1
+  }
+  
+  # Change the name of simulated data's columns to mcq_1 to mcq_30
+  setnames(mcq, old = colnames(mcq), new = column_name_list)
+  
+  # Beliefs about Social Mobility (BSM)
+  bsm <- data.frame(bsm_1 = sample(1:7, N_total, replace = TRUE),
+                    bsm_2 = sample(1:7, N_total, replace = TRUE),
+                    bsm_3 = sample(1:7, N_total, replace = TRUE),
+                    bsm_4 = sample(1:7, N_total, replace = TRUE),
+                    bsm_5 = sample(1:7, N_total, replace = TRUE),
+                    bsm_6 = sample(1:7, N_total, replace = TRUE),
+                    bsm_7 = sample(1:7, N_total, replace = TRUE),
+                    bsm_8 = sample(1:7, N_total, replace = TRUE))
   
   # combine all dataframes
-  all_data <- left_join(income, cra, by = "participant_number") %>%   # %>% 
-    left_join(., hcru, by = "participant_number") %>% 
-    left_join(., cesd, by = "participant_number") %>% 
-    left_join(., pss, by = "participant_number") %>% 
-    left_join(., demographics, by = "participant_number")
+  all_data <- cbind(demographics,cra,hcru,cesd,pss,mcq,bsm)
   
-  #interaction of CRA and SES
-  interaction = (CRA * SES * int_coefficient)
+  write.csv(all_data,"simulated_data.csv", row.names = FALSE)
   
-  #Outcome based on Troy et al. (2017) model without covariates
-  # #CES-D ~ PSS + CRA + SES + CRA*SES
-  outcome = (CRA*CRA_coefficient + 
-               SES*SES_coefficient + 
-               interaction +
-               PSS*PSS_coefficient + 
-               error)
-  
-  POS = 11.80 (4.29)
-  NEG =  13.30 (4.04)
-  CC =  11.50 (3.98)
-  NC =  15.70 (3.49)
-  CSC =  16.00 (4.00)
-  #### Extension+ Block ####
-  #Meta-cognition questionnaire-30 (MCQ)
-  # Estimation based on Tajrishi et al. (2011)
-  MCQ_POS = rtruncnorm(n = N_total, a=6, b=24, mean = 11.80, sd = 4.29)
-  MCQ_POS = round(MCQ_POS)
-  
-  MCQ_NEG = rtruncnorm(n = N_total, a=6, b=24, mean = 13.30, sd = 4.04)
-  MCQ_NEG = round(MCQ_NEG)
-  
-  MCQ_CC = rtruncnorm(n = N_total, a=6, b=24, mean = 11.50, sd = 3.98)
-  MCQ_CC = round(MCQ_CC)
-  
-  MCQ_NC = rtruncnorm(n = N_total, a=6, b=24, mean = 15.70, sd = 3.49)
-  MCQ_NC = round(MCQ_NC)
-  
-  MCQ_CSC = rtruncnorm(n = N_total, a=1, b=5, mean = 16.00, sd = 4.00)
-  MCQ_CSC = round(MCQ_CSC)
-  
-  # Store all simulated data into a dataframe
-  data = data.frame(nr = participant_number,
-                    age = participant_age,
-                    gender = participant_gender,
-                    outcome = outcome,
-                    CRA = CRA,
-                    SES = SES,
-                    PSS = PSS,
-                    HCRU = HCRU,
-                    MCQ_POS = MCQ_POS,
-                    MCQ_NEG = MCQ_NEG,
-                    MCQ_CC = MCQ_CC,
-                    MCQ_NC = MCQ_NC,
-                    MCQ_CSC = MCQ_CSC)
-  
-  return(data)}
+  return(all_data)}
 
+simualted_data = sample_data_function(N_total = 300)
 #### Descriptives ####
 # means, sd, min, max
 # In the first step, the data are summarized to get the descriptive statistics.
 # Subsequently, the data are reformatted. 
 
-data_simulation_function = function(N_total, 
-                                    CRA_coefficient,
-                                    SES_coefficient,
-                                    PSS_coefficient,
-                                    int_coefficient)
   
 descriptive_function = function(scored_data){ 
   
@@ -165,20 +135,7 @@ descriptive_function = function(scored_data){
          HCRU = mean_hcru, PSS = mean_pss, CESD = sum_cesd) 
 }
 
-# Calculate cronbach's alphas
-## *Use RAW scores to calculate alphas
-
-# Select the items from the raw data that belong to the specific scale.
-# calculate alpha and extract raw_alpha from the list the alpha function generates.
-alpha <- all_data %>% 
-  summarize(cra_alpha = select(.,starts_with("cra")) %>% psych::alpha() %>% 
-              pluck("total", "raw_alpha"),  # extract total and then raw_alpha from list 
-            hcru_alpha = select(.,starts_with("hcru")) %>% psych::alpha() %>% 
-              pluck("total", "raw_alpha"), 
-            cesd_alpha = select(.,starts_with("cesd")) %>% psych::alpha() %>%
-              pluck("total", "raw_alpha"),
-            pss_alpha = select(.,starts_with("pss")) %>% psych::alpha() %>%
-              pluck("total", "raw_alpha"))
+# Function to calculate data
 
 
 
