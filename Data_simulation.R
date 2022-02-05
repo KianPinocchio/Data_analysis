@@ -112,6 +112,8 @@ sample_data_function = function(N_total){
   
   return(all_data)}
 
+all_data = sample_data_function(N_total = 300)
+
 # CLEAN UP #################################################
 
 # Clear environment
