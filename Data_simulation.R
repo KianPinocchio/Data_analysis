@@ -1,5 +1,5 @@
 
-## DATA Simulation and Analysis
+## DATA Simulation
 ## Ali Soufizadeh
 
 set.seed(1)
@@ -111,32 +111,6 @@ sample_data_function = function(N_total){
   write.csv(all_data,"simulated_data.csv", row.names = FALSE)
   
   return(all_data)}
-
-#### Descriptives ####
-# means, sd, min, max
-# In the first step, the data are summarized to get the descriptive statistics.
-# Subsequently, the data are reformatted. 
-
-
-descriptive_function = function(scored_data){ 
-  
-  descriptives <- scored_data %>% 
-  summarize(across(c(SES, CRA, PSS, HCRU, sum_cesd, age), 
-                   list(mean = mean, sd = sd, min = min, max = max))) %>% 
-  # bring everything in long format
-  pivot_longer(everything(), names_to = "name") %>%   
-  # separate names at last underscore
-  separate(name, into = c("name","descriptive"), sep = "_(?=[^_]+$)") %>%          
-  # get into a bit wider format again
-  pivot_wider(names_from = name, values_from = value) %>%
-  # rename to have nicer column names
-  rename(Summary = descriptive,  SES = family_income, CRA =  mean_cra,
-         HCRU = mean_hcru, PSS = mean_pss, CESD = sum_cesd) 
-}
-
-# Function to calculate data
-
-
 
 # CLEAN UP #################################################
 
