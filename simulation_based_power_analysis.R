@@ -39,6 +39,40 @@ data_simulation_function <- function(N_total,
   PSS = rtruncnorm(n = N_total, a=1, b=5, mean = 2.70, sd = 0.9)
   PSS = round(PSS)
   
+  # # Replication study data
+  # replication_data = data.frame(outcome = outcome,
+  #                             CRA = CRA,
+  #                             SES = SES,
+  #                             PSS = PSS)
+  # 
+  # # Simulate Meta-cognitive questionnaire data based on Estimation based on Tajrishi (2011)
+  # mcq_pos = rtruncnorm(n = N_total, a=6, b=24, mean = 11.80 , sd = 4.29) # Positive beliefs about worry
+  # mcq_pos = round(mcq_pos)
+  # 
+  # mcq_neg = rtruncnorm(n = N_total, a=6, b=24, mean = 13.30 , sd = 4.04) # negative beliefs about uncontrolability of worry
+  # mcq_neg = round(mcq_neg)
+  # 
+  # mcq_cc = rtruncnorm(n = N_total, a=6, b=24, mean = 11.50, sd = 3.98)
+  # mcq_cc = round(mcq_cc)
+  # 
+  # mcq_nc = rtruncnorm(n = N_total, a=6, b=24, mean = 15.70, sd = 3.49)
+  # mcq_nc = round(mcq_nc)
+  # 
+  # mcq_csc = rtruncnorm(n = N_total, a=6, b=24, mean = 16.00, sd = 4.00)
+  # mcq_csc = round(mcq_csc)
+  # 
+  # extension_study_data <- data.frame(mcq_pos = mcq_pos,
+  #                                     mcq_neg = mcq_neg,
+  #                                     mcq_cc = mcq_cc,
+  #                                     mcq_nc = mcq_nc,
+  #                                     mcq_csc = mcq_csc)
+  # 
+  # mcq_t <- apply(extension_study_data,1,mean)
+  # 
+  # # Simulate Beliefs about Social Mobility (BSM) data.
+  # bsm = rtruncnorm(n = N_total, a=1, b=7, mean = 4 , sd = 1)
+  # bsm = round(bsm)
+  # 
   #error
   error = rnorm(n = N_total, m = 0, sd = sd_error)
   
@@ -116,7 +150,7 @@ hist(all_outcome_observations_SD)
 # Using the estimated SD (SD = 3) we run a simulation based power analysis below
 # Model is based on the study: entering all IVs at the same time
 analysis_function_regression <- function(data){ 
-  regression = lm(outcome ~ CRA + SES + CRA:SES + PSS, data = data)
+  regression = lm(outcome ~ PSS + CRA + SES + CRA:SES, data = data)
   p_value = summary(regression)$coefficients[2,4]
   
   decision = if(p_value < 0.05){"H1"} else {"Inconclusive"}
@@ -149,7 +183,7 @@ number_iterations = 100
 ## Iterate all functions
 ## Save all H1 accepted results
 all_decisions = replicate(n = number_iterations, 
-                          analysis_and_simulation_function(N_total = 100, 
+                          analysis_and_simulation_function(N_total = 300, 
                                                             CRA_coefficient = -0.15,
                                                             SES_coefficient = -0.03,
                                                             PSS_coefficient = 0.53,
