@@ -3,7 +3,7 @@
 # Date: March 25th, 2022
 
 pacman::p_load(pacman, tidyverse, kableExtra, psych, janitor, car, performance, see,
-  gridExtra, interactions, devtools,rmarkdown, knitr)
+  gridExtra, interactions, devtools,rmarkdown, knitr, patchwork)
 
 library(readxl) # for importing excel file
 
@@ -14,8 +14,14 @@ devtools::install_github("easystats/report")
 raw_data <- read_excel("Coded_Combined.xlsx") #save the csv file as a dataframe named "all_data"
 
 # drop all NA
-clean_data <- drop_na(raw_data)
+df <- raw_data
+df[4:69]
+# Drop NA skipping Age column
+df1 <- df[complete.cases(df[4:69]),]
 
+clean_data <- df1
+
+#clean_data <- drop_na(df)
 # Check for duplicates
 sum(duplicated(clean_data))
 
@@ -28,7 +34,7 @@ clean_data <- rename(clean_data, "gender" = "Sex")
 # Check demographics
 clean_data$gender <- factor(clean_data$gender, levels=c(1,2,3,4))
 summary (clean_data$gender)
-summary (clean_data$Age)
+
 
 #Score questionnaires:
 
@@ -157,13 +163,38 @@ apa_table(descriptives) # is only shown when RMarkdown document is knitted
 income_plot<-hist(scored_data$SES,
                   main="Family income distribution",
                   xlab="family income category")
-summary(scored_data$SES)
 
-Mode <- function(x) {
-  ux <- unique(x)
-  ux[which.max(tabulate(match(x, ux)))]
-}
-Mode(scored_data$SES)
+# Mean centre all IVs for regressions with interaction terms
+centred_data <- scored_data %>%
+  mutate(CRA_c = scale(mean_cra, center = TRUE, scale = FALSE),
+         SES_c = scale(SES, center = TRUE, scale = FALSE),
+         PSS_c = scale(mean_pss, center = TRUE, scale = FALSE),
+         HCRU_c = scale(mean_hcru, center = TRUE, scale = FALSE),
+         BSM_c = scale(mean_bsm, center = TRUE, scale = FALSE),
+         POS_c = scale(sum_pos, center = TRUE, scale = FALSE),
+         NEG_c = scale(sum_neg, center = TRUE, scale = FALSE),
+         CC_c = scale(sum_cc, center = TRUE, scale = FALSE),
+         NC_c = scale(sum_nc, center = TRUE, scale = FALSE),
+         CSC_c = scale(sum_csc, center = TRUE, scale = FALSE),
+         MCQ_c = scale(sum_MCQ, center = TRUE, scale = FALSE),)
+
+interaction = BSM_c*SES_c
+# main regression:
+# CRA and SES individually and the interaction between both
+fit <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c, data = centred_data)
+# include our covariates individually:
+#HCRU
+fit_2 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + HCRU_c, data = centred_data)
+#age
+fit_3 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + Age, data = centred_data)
+#gender
+fit_4 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + gender, data = centred_data)
+#They also modelled one regression without controlling for life stress (PSS):
+fit_6 <- lm(sum_cesd ~ CRA_c + SES_c + CRA_c:SES_c, data = centred_data)
+
+summary(fit7)
+
+check_model(fit)
 
 # CLEAN UP #################################################
 
