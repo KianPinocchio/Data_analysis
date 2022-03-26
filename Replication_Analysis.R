@@ -8,7 +8,7 @@ pacman::p_load(pacman, tidyverse, kableExtra, psych, janitor, car, performance, 
   gridExtra, interactions, devtools,rmarkdown, knitr, patchwork, readxl, papaja, report)
 
 # read all data
-raw_data <- read_excel("Coded_Combined.xlsx") #save the csv file as a dataframe named "all_data"
+raw_data <- read_excel("<data_file_address>") #save the excel file as a dataframe named "all_data"
 
 # Handling Missing Data
 # 1. drop all NA
