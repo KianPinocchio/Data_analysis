@@ -4,8 +4,10 @@ author: "Alimohammad Soufizadeh"
 date: "March, 2022"
 ---
 
-pacman::p_load(pacman, tidyverse, kableExtra, psych, janitor, car, performance, see,
-  gridExtra, interactions, devtools,rmarkdown, knitr, patchwork, readxl, papaja, report)
+pacman::p_load(pacman, tidyverse, kableExtra, psych, 
+               janitor, car, performance, see,
+               gridExtra, interactions, devtools,
+               rmarkdown, knitr, patchwork, readxl, papaja, report)
 
 # read all data
 raw_data <- read_excel("<data_file_address>") #save the excel file as a dataframe named "all_data"
