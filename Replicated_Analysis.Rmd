@@ -1,0 +1,189 @@
+---
+title: "Replication of the data analysis in Study1 by Troy et al. (2017) with an Iranian sample."
+author: "Alimohammad Soufizadeh"
+date: "March, 2022"
+---
+
+Load Packages
+```{r}
+pacman::p_load(pacman, tidyverse, kableExtra, psych, janitor, car, performance, see,gridExtra, interactions, devtools,rmarkdown, knitr, patchwork, readxl,papaja
+               ,report)
+
+devtools::install_github("crsh/papaja")
+devtools::install_github("easystats/report")
+```
+
+save the csv file as a dataframe named "all_data"
+```{r}
+raw_data <- read_excel("Coded_Combined.xlsx")
+```
+
+# Handling Missing Data
+1. drop all NA
+```{r}
+clean_data <- drop_na(raw_data)
+```
+
+OR 2. Drop NA skipping Age column
+```
+clean_data <- raw_data[complete.cases(raw_data[4:69]),]
+```
+
+Check for duplicates
+```{r}
+sum(duplicated(clean_data))
+```
+
+# Data summary
+```{r}
+summary(clean_data)
+```
+
+Rename columns
+```{r}
+clean_data <- rename(clean_data, "gender" = "Sex")
+```
+
+Check demographics
+```{r}
+clean_data$gender <- factor(clean_data$gender, levels=c(1,2,3,4))
+summary (clean_data$gender)
+summary (clean_data$Age)
+```
+
+#save variables in separate data frame
+```{r}
+scored_data <- clean_data %>%
+  mutate(across(c("PSS2", "PSS3"), ~{6 - .}),
+         across(c("BSM1", "BSM3", "BSM7", "BSM8"), ~{8 - .}),
+         mean_cra = rowMeans(select(., starts_with("CRA"))),
+         mean_hcru = rowMeans(select(., starts_with("HCRU"))),
+         mean_pss = rowMeans(select(., starts_with("PSS"))),
+         mean_bsm = rowMeans(select(., starts_with("BSM"))),
+         sum_cesd = rowSums(select(., starts_with("CES_D"))))%>%
+         
+  select(id, Age, SES, gender, mean_cra, mean_hcru,
+         sum_cesd, mean_pss)
+```
+
+# Descriptives
+In the first step, the data are summarized to get the descriptive statistics.
+Subsequently, the data are reformatted.
+```{r}
+descriptives <- scored_data %>% 
+  dplyr::summarize(across(c(SES, Age, mean_cra, mean_hcru,sum_cesd, 
+                            mean_pss),
+                   list(mean = mean, sd = sd, min = min, max = max)))%>%
+
+  pivot_longer(everything(), names_to = "name") %>%
+  
+  separate(name, into = c("name","descriptive"), sep = "_(?=[^_]+$)")%>%
+  
+  pivot_wider(names_from = name, values_from = value) %>%
+  
+  rename(Summary = descriptive,
+         CRA = mean_cra,  
+         HCRU = mean_hcru,
+         PSS = mean_pss,  
+         CESD = sum_cesd)
+```
+
+# Calculate cronbach’s alphas
+Select the items from the raw data that belong to the specific scale.
+calculate alpha and extract raw_alpha from the list the alpha function generates.
+
+```{r}
+alpha <- clean_data %>%
+  dplyr::summarize(
+            # Replication Block Alphas
+            cra_alpha = select(.,starts_with("CRA")) %>% psych::alpha() %>%
+              pluck("total", "raw_alpha"),
+            hcru_alpha = select(.,starts_with("HCRU")) %>% psych::alpha() %>%
+              pluck("total", "raw_alpha"),
+            cesd_alpha = select(.,starts_with("CES_D")) %>% psych::alpha() %>%
+              pluck("total", "raw_alpha"),
+            pss_alpha = select(.,starts_with("PSS")) %>% psych::alpha(check.keys=TRUE) %>%
+              pluck("total", "raw_alpha"))
+```
+
+add alphas as extra row to the descriptives table
+```{r}
+descriptives <- descriptives %>%
+  add_row(Summary = "alpha", SES = NA, CRA = alpha$cra_alpha,HCRU = alpha$hcru_alpha,PSS = alpha$pss_alpha, CESD = alpha$cesd_alpha)
+```
+
+make it a nicely formatted table
+```{r}
+apa_table(descriptives)
+```
+
+Plot monthly family income
+```{r}
+income_plot<-hist(scored_data$SES,
+                  main="Family income distribution",
+                  xlab="family income category")
+```
+
+Mean centre all IVs for regressions with interaction terms
+```{r}
+centred_data <- scored_data %>%
+  mutate(CRA_c = scale(mean_cra, center = TRUE, scale = FALSE),
+         SES_c = scale(SES, center = TRUE, scale = FALSE),
+         PSS_c = scale(mean_pss, center = TRUE, scale = FALSE),
+         HCRU_c = scale(mean_hcru, center = TRUE, scale = FALSE))
+```
+# main regression
+CRA and SES individually and the interaction between both
+```{r}
+fit <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c, data = centred_data)
+```
+include our covariates individually
+HCRU
+```{r}
+fit_2 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + HCRU_c, data = centred_data)
+```
+
+Age
+```{r}
+fit_3 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + Age, data = centred_data)
+```
+
+Gender
+```{r}
+fit_4 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + gender, data = centred_data)
+```
+
+Troy et al. (2017) also modeled one regression with race, however, the current study collected data from Iran without asking question about race. This is discussed in detail in the paper.
+
+Troy et al. (2017) also modeled one regression without controlling for life stress (PSS)
+```{r}
+fit_5 <- lm(sum_cesd ~ CRA_c + SES_c + CRA_c:SES_c, data = centred_data)
+```
+
+Check model fit
+```{r}
+check_model(fit)
+```
+
+Model summary
+```{r}
+summary(fit)
+```
+
+# CLEAN UP
+
+Clear environment
+```{r}
+rm(list = ls()) 
+```
+Clear packages
+```{r}
+p_unload(all)
+```
+Clear console
+```{r}
+cat("\014")
+```
+
+
+
