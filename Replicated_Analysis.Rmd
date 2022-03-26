@@ -8,14 +8,11 @@ Load Packages
 ```{r}
 pacman::p_load(pacman, tidyverse, kableExtra, psych, janitor, car, performance, see,gridExtra, interactions, devtools,rmarkdown, knitr, patchwork, readxl,papaja
                ,report)
-
-devtools::install_github("crsh/papaja")
-devtools::install_github("easystats/report")
 ```
 
-save the csv file as a dataframe named "all_data"
+save the excel file as a dataframe named "all_data"
 ```{r}
-raw_data <- read_excel("Coded_Combined.xlsx")
+raw_data <- read_excel("<data_file_address>")
 ```
 
 # Handling Missing Data
