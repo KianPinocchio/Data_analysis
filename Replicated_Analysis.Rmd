@@ -12,7 +12,7 @@ pacman::p_load(pacman, tidyverse, kableExtra, psych, janitor, car, performance, 
 
 save the excel file as a dataframe named "all_data"
 ```{r}
-raw_data <- read_excel("<data_file_address>")
+raw_data <- read_excel("Coded_Combined.xlsx")
 ```
 
 # Handling Missing Data
