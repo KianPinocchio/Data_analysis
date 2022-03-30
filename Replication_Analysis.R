@@ -107,15 +107,7 @@ income_plot<-hist(scored_data$SES,
                   main="Family income distribution",
                   xlab="family income category")
 
-cra_plot<-hist(centred_data$mean_cra,
-                  main="CRA",
-                  xlab="CRA levels")
 
-summary(centred_data$mean_cra)
-sd(centred_data$mean_cra)
-
-summary(centred_data$SES)
-sd(centred_data$SES)
 # Mean centre all IVs for regressions with interaction terms
 centred_data <- scored_data %>%
   mutate(CRA_c = scale(mean_cra, center = TRUE, scale = FALSE),
@@ -149,9 +141,9 @@ interaction_plot <- interactions::interact_plot(model = fit,
                                                 pred = CRA_c,
                                                 modx = SES_c,
                                                 interval=TRUE,
-                                                x.label = "CRA",
-                                                y.label= "CES-D",
-                                                legend.main = "SES")
+                                                x.label = "Cognitive Reappraisal Ability",
+                                                y.label= "Depressive Symptoms",
+                                                legend.main = "family income")
 
 # CLEAN UP #################################################
 
