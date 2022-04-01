@@ -12,16 +12,14 @@ pacman::p_load(pacman, tidyverse, kableExtra, psych,
 # read all data
 raw_data <- read_excel("Coded_Combined.xlsx") #save the excel file as a dataframe named "all_data"
 
-# Handling Missing Data
+# Change column names
+raw_data <- rename(raw_data, "duration" = "Duration(Second)")
+
 # 1. drop all NA
 clean_data <- drop_na(raw_data)
 
-# OR
-# 2. Drop NA skipping Age column
-clean_data <- raw_data[complete.cases(raw_data[4:69]),]
-
 # Check for duplicates
-sum(duplicated(clean_data))
+sum(duplicated(clean_data)) # No duplicates
 
 # Data summary
 summary(clean_data)
