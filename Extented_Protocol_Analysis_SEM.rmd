@@ -5,41 +5,112 @@ socioeconomic status and mental health."
 author: "Alimohammad Soufizadeh"
 date: "March, 2022"
 ---
+```{r}
 pacman::p_load(pacman, tidyverse, kableExtra, psych, lavaan,
-               gridExtra,knitr, readxl, papaja, report)
+               gridExtra,knitr, readxl, papaja, report, mice, VIM)
+```
 
 # read all data
+```{r}
 raw_data <- read_excel("Coded_Combined.xlsx") #save the csv file as a dataframe named "all_data"
+```
+
+Change variable names
+```{r}
+raw_data <- rename(raw_data, 
+                   "duration" = "Duration(Second)",
+                   "gender" = "Sex")
+```
 
 # Handling Missing Data
+
 # 1. drop all NA
+```{r}
 clean_data <- drop_na(raw_data)
+```
 
-# OR
-# 2. Drop NA skipping Age column
+
+OR the HIGH ROAD
+Visualise missing data
+```{r}
+missing.pattern<-md.pattern(raw_data)
+```
+
+# visualising missing data
+```{r}
+library(VIM)
+mice_plot <- aggr(raw_data,numbers=TRUE, sortVars=TRUE,
+                    labels=names(raw_data), cex.axis=.7,
+                    gap=3, ylab=c("Missing data","Pattern"))
+```
+
+Percentage of missing data per row
+```{r}
+no_missing <- raw_data
+percent_missing <- function(x){sum(is.na(x)/length(x)*100)}
+
+missing <- apply(no_missing,1,percent_missing)
+table(missing)
+```
+
+Rows to be imputed
+```{r}
+replace_rows <- subset(no_missing, missing <= 5)
+no_rows <- subset(no_missing, missing > 5)
+```
+
+Missing columns
+```{r}
+missing <- apply(replace_rows, 2, percent_missing)
+table(missing)
+
+replace_columns <- replace_rows %>% select_if(missing<=5)
+no_columns <- replace_rows %>% select_if(missing > 5)
+```
+
+Visualise missing data AGAIN!!!
+
+```{r include=FALSE}
+library(VIM)
+mice_plot_1 <- aggr(replace_columns,numbers=TRUE, sortVars=TRUE,
+                  labels=names(replace_columns), cex.axis=1,
+                  gap=1, ylab=c("Missing data","Pattern"))
+```
+
+# 2. IMPUTE DATA
+Mice easily imputes, taking into account data type.
+```{r include=FALSE}
+tempnomiss <- mice(replace_columns)
+```
+
+Get all the imputed data
+```{r}
+fixed_columns <- complete(tempnomiss)
+```
+
+Putting the data we dropped before back together with the rest
+```{r}
+all_columns <- cbind(no_columns, fixed_columns)
+all_rows <- rbind(all_columns, no_rows)
+```
+
+3. Drop NA skipping Age column
+```{r}
 clean_data <- raw_data[complete.cases(raw_data[4:69]),]
+```
 
-# Or
-# Impute data
+# Prepare for outlier detection
 
-'!!!LOADING!!!!'
+```{r}
+columns = c("Age","gender","id","consent", "Edu", "Platform", "duration")
+demographics <- subset(all_columns, select = columns) 
+all_columns <- all_columns[ , ! names(all_columns) %in% columns]
+all_columns <- cbind(all_columns, demographics)
+```
 
-# Check for duplicates
-sum(duplicated(clean_data))
-
-# Data summary
-summary(clean_data)
-
-# Rename columns
-clean_data <- rename(clean_data, "gender" = "Sex")
-
-# Check demographics
-clean_data$gender <- factor(clean_data$gender, levels=c(1,2,3,4))
-summary (clean_data$gender)
-
-
+```{r}
 #Score questionnaires:
-
+function_score_data <-function(data){
 # Create MCQ subscale variable groups
 mcq_pos <- c("MCQ1","MCQ7","MCQ10",
              "MCQ19","MCQ23","MCQ28")
@@ -58,7 +129,7 @@ mcq_csc <- c("MCQ3","MCQ5","MCQ12",
 
 
 #save variables in separate data frame
-scored_data <- clean_data %>%
+scored_data <- no_outliers %>%
   
   #row mean of the selected columns
   mutate(across(c("PSS2", "PSS3"), ~{6 - .}), # recode PSS items 2 & 3 (6 - response)
@@ -81,13 +152,124 @@ scored_data <- clean_data %>%
   
   
   # select the scores/final variables used, remove the raw items
-  select(id, Age, SES, gender, mean_cra, mean_hcru,
+  select(id, Age, gender, SES,mean_cra, mean_hcru,
          sum_cesd, mean_pss, mean_bsm, sum_pos, sum_neg, sum_cc, sum_nc, sum_csc, sum_MCQ)
+}
+```
+
+# Outliers
+
+## Outliers Mahalanobis 
+degrees of freedom in this case is based on the nr of variables (columns)
+```{r} 
+# Mahalanobis for raw data
+mahal <- mahalanobis(all_columns[ , -c(63:69)],
+  colMeans(all_columns[ , -c(63:69)], na.rm=TRUE),
+  cov(all_columns[ , -c(63:69)], use ="pairwise.complete.obs"))
+
+cutoff <- qchisq(p = 1 - .001, #1 minus alpha
+                 df = ncol(all_columns[ , -c(63:69)])) # number of columns
+```
+
+```{r}
+cutoff
+summary(mahal < cutoff) #notice the direction 
+no_outliers <- subset(all_columns, mahal < cutoff)
+```
+
+```{r}
+# Mahalanobis for scored data
+mahal <- mahalanobis(scored_data[ , -c(1:3)],
+  colMeans(scored_data[ , -c(1:3)], na.rm=TRUE),
+  cov(scored_data[ , -c(1:3)], use ="pairwise.complete.obs"), tol = 1e-20)
+
+cutoff <- qchisq(p = 1 - .001, #1 minus alpha
+                 df = ncol(scored_data[ , -c(1:3)])) # number of columns
+```
+
+```{r}
+# Exclusing outliers among scored data based on Mahalanobis
+cutoff
+summary(mahal < cutoff) #notice the direction 
+no_outliers1 <- subset(scored_data, mahal < cutoff)
+```
+
+## Assumptions Additivity
+
+- Additivity is the assumption that each variable adds something to the model
+- You basically do not want to use the same variable twice, as that lowers power
+- Often this is described as multicollinearity (The problem is multicollineartiy). The assumption is called additivity.
+- Mainly, SEM analysis has a lot of correlated variables, you just want to make sure they aren't perfectly correlated
+
+## Assumptions Additivity
+
+```{r}
+library(corrplot)
+corrplot(cor(no_outliers1[ , -c(1:3)]))
+```
+
+## Assumptions Set Up
+
+```{r}
+random_variable <- rchisq(nrow(no_outliers1), 7)
+fake_model <- lm(random_variable ~ ., # no_outliers1$sum_cesd
+                 data = no_outliers1[ , -c(1:3)])
+standardized <- rstudent(fake_model) # residuals
+fitvalues <- scale(fake_model$fitted.values) # z-score them
+```
+
+## Assumptions Linearity
+
+- We assume the the multivariate relationship between continuous variables is linear (i.e., no curved)
+- There are many ways to test this, but we can use a QQ/PP Plot to examine for linearity
+
+```{r}
+plot(fake_model, 2)
+```
+## Assumptions Normality
+
+- We expect that the residuals are normally distributed
+- Not that the *sample* is normally distributed 
+- Generally, SEM requires a large sample size, thus, buffering against normality deviations
+
+```{r}
+hist(standardized)
+```
+## Assumptions Homogeneity + Homoscedasticity
+
+- These assumptions are about equality of the variances
+- We assume equal variances between groups for things like t-tests, ANOVA
+- Here the assumption is equality in the spread of variance across predicted values 
+
+```{r}
+{plot(standardized, fitvalues)
+  abline(v = 0)
+  abline(h = 0)
+}
+```
+
+# Check for duplicates
+```{r}
+clean_data <- no_outliers1
+sum(duplicated(clean_data))
+```
+# Data summary
+```{r}
+summary(clean_data)
+```
+
+# Check demographics
+```{r}
+clean_data$gender <- factor(clean_data$gender, levels=c(1,2,3,4))
+summary (clean_data$gender)
+```
+
 
 # Descriptives
 
 # In the first step, the data are summarized to get the descriptive statistics.
 #Subsequently, the data are reformatted.
+```{r}
 descriptives <- scored_data %>% 
   dplyr::summarize(across(c(SES, Age, mean_cra, mean_hcru,sum_cesd, 
                             mean_pss, mean_bsm, sum_pos, 
@@ -116,10 +298,12 @@ descriptives <- scored_data %>%
          NC = sum_nc, #
          CSC = sum_csc, #
          MCQT = sum_MCQ) # MCQ =Meta Cognitions Questionnaire Total
+```
 
 # Calculate cronbach’s alphas
 # Select the items from the raw data that belong to the specific scale.
 # calculate alpha and extract raw_alpha from the list the alpha function generates.
+```{r}
 alpha <- clean_data %>%
   dplyr::summarize(
     # Replication Block Alphas
@@ -156,17 +340,22 @@ descriptives <- descriptives %>%
           PSS = alpha$pss_alpha, CESD = alpha$cesd_alpha, BSM = alpha$BSM_alpha,
           POS = alpha$pos_alpha, NEG = alpha$neg_alpha, CC = alpha$cc_alpha,
           NC = alpha$nc_alpha, CSC = alpha$csc_alpha, MCQT = alpha$mcq_alpha)
-
+```
 # make it a nicely formatted table
+```{r}
 library(rmarkdown)
 apa_table(descriptives) # is only shown when RMarkdown document is knitted
+```
 
 # Plot monthly family income
+```{r}
 income_plot<-hist(scored_data$SES,
                   main="Family income distribution",
                   xlab="family income category")
+```
 
 # Mean centre all IVs for regressions with interaction terms
+```{r}
 centred_data <- scored_data %>%
   mutate(CRA_c = scale(mean_cra, center = TRUE, scale = FALSE),
          SES_c = scale(SES, center = TRUE, scale = FALSE),
@@ -181,28 +370,35 @@ centred_data <- scored_data %>%
          MCQ_c = scale(sum_MCQ, center = TRUE, scale = FALSE))
 
 # Save prepared data
-write.csv(centred_data,"test_sem.csv", row.names = FALSE)
+write.csv(centred_data,"prepared_data.csv", row.names = FALSE)
+```
 
-# read data
-data <- read_csv("test_sem.csv")
+# read new data
+```{r}
+data <- read_csv("prepared_data.csv")
+```
 
 ##### Three-way interaction #####
 
 # Rename variables
+```{r}
 data <- data %>% mutate(rename(data,
                                "Y" = "sum_cesd",
                                "X" = "CRA_c",
                                "W" = "SES_c",
                                "Z" = "BSM_c",
                                "COV" = "PSS_c"))
-
+```
 # Create interaction terms
+```{r}
 data <- data %>% mutate(X.W = X * W,
                         X.Z = X * Z,
                         W.Z = W * Z,
                         X.W.Z = X * W * Z)
+```
 
 # Create model
+```{r}
 mod.mod.model = 
   "
 Y ~ a1 *COV + b1*X + b2*W + b3*Z + b4*X.W  + b5*X.Z + b6*W.Z + b7*X.W.Z
@@ -218,7 +414,10 @@ indirect.SDL := b4 + b7 * (Z.mean - sqrt(Z.c.var))
 indirect.SDM := b4 + b7 * (Z.mean)
 indirect.SDH := b4 + b7 * (Z.mean + sqrt(Z.c.var))
 "
+```
+
 # Fit model
+```{r}
 mod.mod.fit=sem(model=mmod.mod.model,
         data=data,
         se='bootstrap',
@@ -234,14 +433,21 @@ parameterEstimates(mod.mod.fit, remove.nonfree = TRUE)
 plot_4 = semPaths(mod.mod.fit, fixedStyle = 1, layout = "tree2", 
                   intercepts = T, label.scale=T, nCharNodes = 0, 
                   sizeMan2=3, sizeMan=7, asize=2, residuals = F, exoCov = F)
+```
 
 # CLEAN UP #################################################
 
 # Clear environment
+```{r}
 rm(list = ls()) 
+```
 
 # Clear packages
+```{r}
 p_unload(all)
+```
 
 # Clear console
+```{r}
 cat("\014")
+```

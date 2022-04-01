@@ -13,7 +13,9 @@ pacman::p_load(pacman, tidyverse, kableExtra, psych,
 raw_data <- read_excel("Coded_Combined.xlsx") #save the excel file as a dataframe named "all_data"
 
 # Change column names
-raw_data <- rename(raw_data, "duration" = "Duration(Second)")
+raw_data <- rename(raw_data, 
+                   "duration" = "Duration(Second)",
+                   "gender" = "Sex")
 
 # 1. drop all NA
 clean_data <- drop_na(raw_data)
