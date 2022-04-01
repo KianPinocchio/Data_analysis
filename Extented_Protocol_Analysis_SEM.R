@@ -180,8 +180,61 @@ centred_data <- scored_data %>%
          CSC_c = scale(sum_csc, center = TRUE, scale = FALSE),
          MCQ_c = scale(sum_MCQ, center = TRUE, scale = FALSE))
 
+# Save prepared data
 write.csv(centred_data,"test_sem.csv", row.names = FALSE)
 
+# read data
+data <- read_csv("test_sem.csv")
+
+##### Three-way interaction #####
+
+# Rename variables
+data <- data %>% mutate(rename(data,
+                               "Y" = "sum_cesd",
+                               "X" = "CRA_c",
+                               "W" = "SES_c",
+                               "Z" = "BSM_c",
+                               "COV" = "PSS_c"))
+
+# Create interaction terms
+data <- data %>% mutate(X.W = X * W,
+                        X.Z = X * Z,
+                        W.Z = W * Z,
+                        X.W.Z = X * W * Z)
+
+# Create model
+mod.mod.model = 
+  "
+Y ~ a1 *COV + b1*X + b2*W + b3*Z + b4*X.W  + b5*X.Z + b6*W.Z + b7*X.W.Z
+
+#Mean of centred W (for use in simple slopes)
+Z ~ Z.mean*1
+
+#Variance of centred W (for use in simple slopes)
+Z ~~ Z.c.var*Z
+
+#Indirect effects conditional on moderator (a1 + a3*ModValue)*b1
+indirect.SDL := b4 + b7 * (Z.mean - sqrt(Z.c.var))
+indirect.SDM := b4 + b7 * (Z.mean)
+indirect.SDH := b4 + b7 * (Z.mean + sqrt(Z.c.var))
+
+"
+# Fit model
+mod.mod.fit=sem(model=mmod.mod.model,
+        data=data,
+        se='bootstrap',
+        bootstrap=10)
+
+# Summarise measures
+summary(mod.mod.fit,fit.measures = FALSE,standardize = TRUE, rsquare = TRUE, ci = TRUE)
+
+# Parameters table
+parameterEstimates(mod.mod.fit, remove.nonfree = TRUE)
+
+# Plot model
+plot_4 = semPaths(mod.mod.fit, fixedStyle = 1, layout = "tree2", 
+                  intercepts = T, label.scale=T, nCharNodes = 0, 
+                  sizeMan2=3, sizeMan=7, asize=2, residuals = F, exoCov = F)
 
 # CLEAN UP #################################################
 
