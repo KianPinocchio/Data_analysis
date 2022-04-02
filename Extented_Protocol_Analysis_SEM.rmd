@@ -390,11 +390,12 @@ data <- centre_data_to_csv(scored_data)
 # Rename variables
 ```{r}
 data <- data %>% mutate(rename(data,
-                               "Y" = "sum_cesd",
-                               "X" = "CRA_c",
-                               "W" = "SES_c",
-                               "Z" = "BSM_c",
-                               "X1" = "PSS_c"))
+                                "X" = "CRA_c",
+                                "Y" = "sum_cesd",
+                                "W" = "SES_c",
+                                "Z" = "BSM_c",
+                                "COV" = "PSS_c",
+                               "M" = "NEG_c"))
 ```
 # Create interaction terms
 ```{r}
@@ -402,7 +403,10 @@ data <- data %>% mutate(rename(data,
 data <- data %>% mutate(X.W = X * W,
                         X.Z = X * Z,
                         W.Z = W * Z,
-                        X.W.Z = X * W * Z)
+                        X.W.Z = X * W * Z,
+                        M.W = M * W,
+                        M.Z = M * Z,
+                        M.W.Z = M * W * Z)
 ```
 
 # Three-way moderation model
@@ -435,29 +439,83 @@ interactions::interact_plot(model_1, pred = X, modx = W, mod2 = Z, centered = "n
 
 # Model
 ```{r}
-med.mod3.model <-
+MOD.MED.model <-
 "
-NEG_c ~ a*CRA_c
-sum_cesd ~ c1*CRA_c+c2*SES_c+c3*BSM_c+c4*CRA_c:SES_c+c5*CRA_c:BSM_c+c6*SES_c:BSM_c+c7*interaction1+b1*NEG_c+b2*SES_c+b3*BSM_c+b4*NEG_c:SES_c+b5*NEG_c:BSM_c+b6*SES_c:BSM_c+b7*interaction0 + g*PSS_c
-SES_c ~ SES_c.mean*1
-SES_c ~~ SES_c.var*SES_c
-BSM_c ~ BSM_c.mean*1
-BSM_c ~~ BSM_c.var*BSM_c
-indirect :=(a)*(b1+b4*SES_c.mean+b5*BSM_c.mean)
-direct :=c1+c4*SES_c.mean+c5*BSM_c.mean
+# Mediator
+M ~ a*X
+
+# Outcome being predicted by the model
+Y ~ c1*X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z +
+b1*M + b2*W + b3*Z + b4*M.W + b5*M.Z + b6*W.Z + b7*M.W.Z 
++ g*COV
+
+# Covariance: A main predictor's covariance is fixed so it does not 
+# covary with the rest of the variables, since the theory does not explicitely address this
+COV ~~ COV
+
+# Intercept and variance of W for conditional effects analysis
+W ~ W.mean*1
+W ~~ W.var * W
+
+# Intercept and variance of Z for conditional effects analysis
+Z ~ Z.mean*1
+Z ~~ Z.var*Z
+
+# Indirect effect of X on Y through M, conditional on mean values of W and Z
+indirect := (a) * ( b1 + b4*W.mean + b5*Z.mean)
+
+# Direct effect of X on Y, moderated by W and Z
+direct := c1 + c4*W.mean + c5*Z.mean
+
+# Total effect
 total := direct + indirect
+
+# Proportion of effect mediated
 prop.mediated := indirect / total
-indirect.below :=(a)*(b1+b4*(SES_c.mean-sqrt(SES_c.var))+b5*(BSM_c.mean-sqrt(BSM_c.var)))
-indirect.above :=(a)*(b1+b4*(SES_c.mean+sqrt(SES_c.var))+b5*(BSM_c.mean+sqrt(BSM_c.var)))
-direct.below:=c1+c4*(SES_c.mean-sqrt(SES_c.var))+c5*(BSM_c.mean-sqrt(BSM_c.var))
-direct.above:=c1+c4*(SES_c.mean+sqrt(SES_c.var))+c5*(BSM_c.mean+sqrt(BSM_c.var))
+
+# Conditional indirect effect through mediator (M)
+indirect.below :=(a)*(b1+b4*(W.mean - sqrt(W.var))+ b5*(Z.mean - sqrt(Z.var)))
+indirect.above :=(a)*(b1+b4*(W.mean + sqrt(W.var))+ b5*(Z.mean + sqrt(Z.var)))
+
+# Conditional direct effect moderated by W and Z
+direct.below:=c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var))
+direct.above:=c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var))
+
+# Conditional total effect
 total.below := direct.below + indirect.below
 total.above := direct.above + indirect.above
+
+# Proportion of mediation under conditions of W and one SD above or below mean
 prop.mediated.below := indirect.below / total.below
 prop.mediated.above := indirect.above / total.above
 "
 ```
 
+Fit the model
+```{r}
+Mod.Med.SEM <- sem(model = med.mod3.model,
+                   data = data,
+                   se = "bootstrap",
+                   bootstrap = 200) # do 5000 when actually running the code
+```
+
+Model summary
+```{r}
+summary(Mod.Med.SEM, fit.measures = FALSE, standardize = TRUE, rsquare = TRUE)
+```
+
+```{r include=FALSE}
+# Parameters table
+parameterEstimates(Mod.Med.SEM, remove.nonfree = TRUE)
+```
+
+# Plot the moderated mediation model
+```{r}
+# Plot model
+plot_3 = semPaths(Mod.Med.SEM, fixedStyle = 1, layout = "tree", 
+                  intercepts = F, label.scale=T, nCharNodes = 0, 
+                  sizeMan2=3, sizeMan=7, asize=2, residuals = F, exoCov = T)
+```
 
 # CLEAN UP #################################################
 
