@@ -408,16 +408,21 @@ mod.mod.model =
   "
 Y ~ a1 *X1 + b1*X + b2*W + b3*Z + b4*X.W  + b5*X.Z + b6*W.Z + b7*X.W.Z
 
-#Mean of centred W (for use in simple slopes)
+#Mean of centred W & Z (for use in simple slopes)
+W ~ W.mean*1
 Z ~ Z.mean*1
 
-#Variance of centred W (for use in simple slopes)
+#Variance of centred W & Z (for use in simple slopes)
 Z ~~ Z.c.var*Z
+W ~~ W.c.var*W
 
-#Indirect effects conditional on moderator (b4 + b73*ModValue)
-indirect.SDL := b4 + b7 * (Z.mean - sqrt(Z.c.var))
-indirect.SDM := b4 + b7 * (Z.mean)
-indirect.SDH := b4 + b7 * (Z.mean + sqrt(Z.c.var))
+# Direct effect
+direct:= b1 + b4*W.mean + b5*W.mean
+
+#Indirect effects conditional on moderator (b1 + b4*Mod1Value + b7*Mod2Value)
+direct.SDL := b1 + b4 * (W.mean - sqrt(W.c.var)) + b7 * (Z.mean - sqrt(Z.c.var))
+direct.SDM := b1 + b4 * (W.mean) + b7 * (Z.mean)
+direct.SDH := b1 + b4 * (W.mean - sqrt(W.c.var)) + b7 * (Z.mean + sqrt(Z.c.var))
 "
 ```
 
