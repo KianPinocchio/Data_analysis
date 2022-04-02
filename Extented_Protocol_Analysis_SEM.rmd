@@ -385,7 +385,7 @@ return(centred_data)
 data <- centre_data_to_csv(scored_data)
 ```
 
-##### Three-way interaction #####
+##### Hypotheses B1 & B2: Three-way interaction #####
 
 # Rename variables
 ```{r}
@@ -398,59 +398,66 @@ data <- data %>% mutate(rename(data,
 ```
 # Create interaction terms
 ```{r}
-data <- indProd(data1, 16, 17, 20, match = TRUE, meanC = FALSE,
-        residualC = FALSE, doubleMC = FALSE, namesProd = c("X.W","X.Z","W.Z","X.W.Z"))
+# Create interaction terms
+data <- data %>% mutate(X.W = X * W,
+                        X.Z = X * Z,
+                        W.Z = W * Z,
+                        X.W.Z = X * W * Z)
 ```
 
 # Three-way moderation model
 ```{r}
-mod.mod.model = 
-  "
-Y ~ a1 *X1 + b1*X + b2*W + b3*Z + b4*X.W  + b5*X.Z + b6*W.Z + b7*X.W.Z
+mod.mod.model = lm(Y ~ X1 + X + W + Z + X*W  + X*Z + W*Z + X*W*Z, data = dat)
+```
 
-#Mean of centred W & Z (for use in simple slopes)
-W ~ W.mean*1
-Z ~ Z.mean*1
+# Check model fit
+```{r}
+performance::check_model(model_1)
+```
 
-#Variance of centred W & Z (for use in simple slopes)
-Z ~~ Z.c.var*Z
-W ~~ W.c.var*W
 
-# Direct effect
-direct:= b1 + b4*W.mean + b5*W.mean
+# Simple slopes analysis
+```{r}
+interactions::sim_slopes(model_1, pred = X, modx=W, mod2 = Z, modxvals = NULL, 
+                         jnalpha = 0.05, digits = 3, n.sd = 1)
+```
 
-#Indirect effects conditional on moderator (b1 + b4*Mod1Value + b7*Mod2Value)
-direct.SDL := b1 + b4 * (W.mean - sqrt(W.c.var)) + b7 * (Z.mean - sqrt(Z.c.var))
-direct.SDM := b1 + b4 * (W.mean) + b7 * (Z.mean)
-direct.SDH := b1 + b4 * (W.mean - sqrt(W.c.var)) + b7 * (Z.mean + sqrt(Z.c.var))
+# Plot simple slopes for interaction
+```{r}
+interactions::interact_plot(model_1, pred = X, modx = W, mod2 = Z, centered = "none", 
+              y.label = "Cognitive Reappraisal Ability",
+              x.label = "Socioeconomic Status",
+              interval = TRUE,
+              data = dat)
+```
+
+##### Hypotheses C1 & C2: Moderated Mediation #####
+
+# Model
+```{r}
+med.mod3.model <-
+"
+NEG_c ~ a*CRA_c
+sum_cesd ~ c1*CRA_c+c2*SES_c+c3*BSM_c+c4*CRA_c:SES_c+c5*CRA_c:BSM_c+c6*SES_c:BSM_c+c7*interaction1+b1*NEG_c+b2*SES_c+b3*BSM_c+b4*NEG_c:SES_c+b5*NEG_c:BSM_c+b6*SES_c:BSM_c+b7*interaction0 + g*PSS_c
+SES_c ~ SES_c.mean*1
+SES_c ~~ SES_c.var*SES_c
+BSM_c ~ BSM_c.mean*1
+BSM_c ~~ BSM_c.var*BSM_c
+indirect :=(a)*(b1+b4*SES_c.mean+b5*BSM_c.mean)
+direct :=c1+c4*SES_c.mean+c5*BSM_c.mean
+total := direct + indirect
+prop.mediated := indirect / total
+indirect.below :=(a)*(b1+b4*(SES_c.mean-sqrt(SES_c.var))+b5*(BSM_c.mean-sqrt(BSM_c.var)))
+indirect.above :=(a)*(b1+b4*(SES_c.mean+sqrt(SES_c.var))+b5*(BSM_c.mean+sqrt(BSM_c.var)))
+direct.below:=c1+c4*(SES_c.mean-sqrt(SES_c.var))+c5*(BSM_c.mean-sqrt(BSM_c.var))
+direct.above:=c1+c4*(SES_c.mean+sqrt(SES_c.var))+c5*(BSM_c.mean+sqrt(BSM_c.var))
+total.below := direct.below + indirect.below
+total.above := direct.above + indirect.above
+prop.mediated.below := indirect.below / total.below
+prop.mediated.above := indirect.above / total.above
 "
 ```
 
-# Fit moderation model
-```{r}
-mod.mod.fit=sem(model= mod.mod.model,
-        data=data,
-        se='bootstrap',
-        bootstrap=500)
-
-# Summarise measures
-summary(mod.mod.fit,fit.measures = FALSE,standardize = TRUE, rsquare = TRUE, ci = TRUE)
-
-# Parameters table
-parameterEstimates(mod.mod.fit, remove.nonfree = TRUE)
-```
-
-```{r}
-# Plot model
-mod.mod.plot = semPaths(mod.mod.fit, fixedStyle = 1, layout = "tree2", 
-                  intercepts = T, label.scale=T, nCharNodes = 0, 
-                  sizeMan2=3, sizeMan=7, asize=2, residuals = F, exoCov = F)
-```
-
-# Simple slopes
-```{r}
-
-```
 
 # CLEAN UP #################################################
 
