@@ -12,7 +12,7 @@ pacman::p_load(pacman, tidyverse, kableExtra, psych, lavaan,
 
 # read all data
 ```{r}
-raw_data <- read_excel("Coded_Combined.xlsx") #save the csv file as a dataframe named "all_data"
+raw_data <- read_excel("Coded_data.xlsx")
 ```
 
 Change variable names
@@ -25,13 +25,13 @@ raw_data <- rename(raw_data,
 # Handling Missing Data
 
 # 1. drop all NA
-```{r}
+```{r eval=FALSE, include=FALSE}
 clean_data <- drop_na(raw_data)
 ```
 
 
-OR the HIGH ROAD
-Visualise missing data
+OR take the HIGH ROAD to IMPUTATION
+Missing data pattern
 ```{r}
 missing.pattern<-md.pattern(raw_data)
 ```
@@ -77,9 +77,9 @@ mice_plot_1 <- aggr(replace_columns,numbers=TRUE, sortVars=TRUE,
                   gap=1, ylab=c("Missing data","Pattern"))
 ```
 
-# 2. IMPUTE DATA
+# IMPUTE DATA
 Mice easily imputes, taking into account data type.
-```{r include=FALSE}
+```{r message=TRUE, include=FALSE}
 tempnomiss <- mice(replace_columns)
 ```
 
@@ -91,11 +91,11 @@ fixed_columns <- complete(tempnomiss)
 Putting the data we dropped before back together with the rest
 ```{r}
 all_columns <- cbind(no_columns, fixed_columns)
-all_rows <- rbind(all_columns, no_rows)
+#all_rows <- rbind(all_columns, no_rows) # Only use if you want all other rows with NA binded as well
 ```
 
-3. Drop NA skipping Age column
-```{r}
+3. ALT way of handling Missing Data: Drop ALL NA skipping the Age column
+```{r eval=FALSE, include=FALSE}
 clean_data <- raw_data[complete.cases(raw_data[4:69]),]
 ```
 
@@ -105,7 +105,7 @@ clean_data <- raw_data[complete.cases(raw_data[4:69]),]
 columns = c("Age","gender","id","consent", "Edu", "Platform", "duration")
 demographics <- subset(all_columns, select = columns) 
 all_columns <- all_columns[ , ! names(all_columns) %in% columns]
-all_columns <- cbind(all_columns, demographics)
+clean_data <- cbind(all_columns, demographics)
 ```
 
 ```{r}
@@ -154,6 +154,7 @@ scored_data <- no_outliers %>%
   # select the scores/final variables used, remove the raw items
   select(id, Age, gender, SES,mean_cra, mean_hcru,
          sum_cesd, mean_pss, mean_bsm, sum_pos, sum_neg, sum_cc, sum_nc, sum_csc, sum_MCQ)
+return(scored_data)
 }
 ```
 
@@ -163,22 +164,23 @@ scored_data <- no_outliers %>%
 degrees of freedom in this case is based on the nr of variables (columns)
 ```{r} 
 # Mahalanobis for raw data
-mahal <- mahalanobis(all_columns[ , -c(63:69)],
-  colMeans(all_columns[ , -c(63:69)], na.rm=TRUE),
-  cov(all_columns[ , -c(63:69)], use ="pairwise.complete.obs"))
+mahal <- mahalanobis(clean_data[ , -c(63:69)],
+  colMeans(clean_data[ , -c(63:69)], na.rm=TRUE),
+  cov(clean_data[ , -c(63:69)], use ="pairwise.complete.obs"))
 
 cutoff <- qchisq(p = 1 - .001, #1 minus alpha
-                 df = ncol(all_columns[ , -c(63:69)])) # number of columns
+                 df = ncol(clean_data[ , -c(63:69)])) # number of columns
 ```
 
 ```{r}
 cutoff
 summary(mahal < cutoff) #notice the direction 
-no_outliers <- subset(all_columns, mahal < cutoff)
+clean_data <- subset(clean_data, mahal < cutoff)
 ```
 
 ```{r}
 # Mahalanobis for scored data
+scored_data <- function_score_data(clean_data) #score data first, to find outliers among scored data
 mahal <- mahalanobis(scored_data[ , -c(1:3)],
   colMeans(scored_data[ , -c(1:3)], na.rm=TRUE),
   cov(scored_data[ , -c(1:3)], use ="pairwise.complete.obs"), tol = 1e-20)
@@ -191,7 +193,7 @@ cutoff <- qchisq(p = 1 - .001, #1 minus alpha
 # Exclusing outliers among scored data based on Mahalanobis
 cutoff
 summary(mahal < cutoff) #notice the direction 
-no_outliers1 <- subset(scored_data, mahal < cutoff)
+clean_data <- subset(scored_data, mahal < cutoff)
 ```
 
 ## Assumptions Additivity
@@ -205,15 +207,15 @@ no_outliers1 <- subset(scored_data, mahal < cutoff)
 
 ```{r}
 library(corrplot)
-corrplot(cor(no_outliers1[ , -c(1:3)]))
+corrplot(cor(clean_data[ , -c(1:3)]))
 ```
 
 ## Assumptions Set Up
 
 ```{r}
-random_variable <- rchisq(nrow(no_outliers1), 7)
-fake_model <- lm(random_variable ~ ., # no_outliers1$sum_cesd
-                 data = no_outliers1[ , -c(1:3)])
+random_variable <- rchisq(nrow(clean_data), 7)
+fake_model <- lm(random_variable ~ ., # What's the difference if I regress on clean_data$sum_cesd ??
+                 data = clean_data[ , -c(1:3)])
 standardized <- rstudent(fake_model) # residuals
 fitvalues <- scale(fake_model$fitted.values) # z-score them
 ```
@@ -250,7 +252,6 @@ hist(standardized)
 
 # Check for duplicates
 ```{r}
-clean_data <- no_outliers1
 sum(duplicated(clean_data))
 ```
 # Data summary
@@ -356,6 +357,7 @@ income_plot<-hist(scored_data$SES,
 
 # Mean centre all IVs for regressions with interaction terms
 ```{r}
+centre_data_to_csv <- function(x){
 centred_data <- scored_data %>%
   mutate(CRA_c = scale(mean_cra, center = TRUE, scale = FALSE),
          SES_c = scale(SES, center = TRUE, scale = FALSE),
@@ -371,11 +373,16 @@ centred_data <- scored_data %>%
 
 # Save prepared data
 write.csv(centred_data,"prepared_data.csv", row.names = FALSE)
+
+return(centred_data)
+}
 ```
 
 # read new data
 ```{r}
-data <- read_csv("prepared_data.csv")
+# data <- read_csv("prepared_data.csv") # Read csv data from computer
+# or
+data <- centre_data_to_csv(scored_data)
 ```
 
 ##### Three-way interaction #####
@@ -387,21 +394,19 @@ data <- data %>% mutate(rename(data,
                                "X" = "CRA_c",
                                "W" = "SES_c",
                                "Z" = "BSM_c",
-                               "COV" = "PSS_c"))
+                               "X1" = "PSS_c"))
 ```
 # Create interaction terms
 ```{r}
-data <- data %>% mutate(X.W = X * W,
-                        X.Z = X * Z,
-                        W.Z = W * Z,
-                        X.W.Z = X * W * Z)
+data <- indProd(data1, 16, 17, 20, match = TRUE, meanC = FALSE,
+        residualC = FALSE, doubleMC = FALSE, namesProd = c("X.W","X.Z","W.Z","X.W.Z"))
 ```
 
-# Create model
+# Three-way moderation model
 ```{r}
 mod.mod.model = 
   "
-Y ~ a1 *COV + b1*X + b2*W + b3*Z + b4*X.W  + b5*X.Z + b6*W.Z + b7*X.W.Z
+Y ~ a1 *X1 + b1*X + b2*W + b3*Z + b4*X.W  + b5*X.Z + b6*W.Z + b7*X.W.Z
 
 #Mean of centred W (for use in simple slopes)
 Z ~ Z.mean*1
@@ -416,23 +421,30 @@ indirect.SDH := b4 + b7 * (Z.mean + sqrt(Z.c.var))
 "
 ```
 
-# Fit model
+# Fit moderation model
 ```{r}
-mod.mod.fit=sem(model=mmod.mod.model,
+mod.mod.fit=sem(model= mod.mod.model,
         data=data,
         se='bootstrap',
-        bootstrap=10)
+        bootstrap=500)
 
 # Summarise measures
 summary(mod.mod.fit,fit.measures = FALSE,standardize = TRUE, rsquare = TRUE, ci = TRUE)
 
 # Parameters table
 parameterEstimates(mod.mod.fit, remove.nonfree = TRUE)
+```
 
+```{r}
 # Plot model
-plot_4 = semPaths(mod.mod.fit, fixedStyle = 1, layout = "tree2", 
+mod.mod.plot = semPaths(mod.mod.fit, fixedStyle = 1, layout = "tree2", 
                   intercepts = T, label.scale=T, nCharNodes = 0, 
                   sizeMan2=3, sizeMan=7, asize=2, residuals = F, exoCov = F)
+```
+
+# Simple slopes
+```{r}
+
 ```
 
 # CLEAN UP #################################################
