@@ -247,7 +247,9 @@ plot(fake_model, 2)
 ```{r}
 hist(standardized)
 ```
-# Assumptions Homogeneity + Homoscedasticity
+
+
+#Assumptions Homogeneity and Homoscedasticity
 - These assumptions are about equality of the variances
 - Here the assumption is equality in the spread of variance across predicted values 
 
