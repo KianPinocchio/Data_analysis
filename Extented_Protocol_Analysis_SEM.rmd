@@ -227,7 +227,7 @@ corrplot(cor(plot_data))
 # Assumptions Set Up
 ```{r}
 random_variable <- rchisq(nrow(scored_data), 7)
-fake_model <- lm(random_variable ~ ., # What's the difference if I regress on scored_data$sum_cesd ??
+fake_model <- lm(scored_data$sum_cesd ~ ., # What's the difference if I regress on scored_data$sum_cesd ??
                  data = scored_data[ , -c(1:69)])
 standardized <- rstudent(fake_model) # residuals
 fitvalues <- scale(fake_model$fitted.values) # z-score them
