@@ -181,11 +181,6 @@ scored_data <- no_outlier %>%
          sum_nc = rowSums(select(.,all_of(mcq_nc))),
          sum_csc = rowSums(select(.,all_of(mcq_csc))),
          sum_MCQ = rowSums(select(.,starts_with("MCQ"))))%>%
-  
-  
-  # select the scores/final variables used, remove the raw items
-  #select(id, Age, gender, SES,mean_cra, mean_hcru,
-  #       sum_cesd, mean_pss, mean_bsm, sum_pos, sum_neg, sum_cc, sum_nc, sum_csc, sum_MCQ)
 return(scored_data)
 }
 ```
@@ -212,16 +207,16 @@ summary(scored_data)
 
 ```{r}
 library(corrplot)
-plot_data <- cbind(final_scored_data$SES,final_scored_data[ , -c(1:69)])
+plot_data <- cbind(scored_data$SES,scored_data[ , -c(1:69)])
 corrplot(cor(plot_data))
 ```
 
 ## Assumptions Set Up
 
 ```{r}
-random_variable <- rchisq(nrow(final_scored_data), 7)
+random_variable <- rchisq(nrow(scored_data), 7)
 fake_model <- lm(random_variable ~ ., # What's the difference if I regress on scored_data$sum_cesd ??
-                 data = final_scored_data[ , -c(1:69)])
+                 data = scored_data[ , -c(1:69)])
 standardized <- rstudent(fake_model) # residuals
 fitvalues <- scale(fake_model$fitted.values) # z-score them
 ```
@@ -254,17 +249,13 @@ hist(standardized)
 
 # Check for duplicates
 ```{r}
-sum(duplicated(final_scored_data))
-```
-# Data summary
-```{r}
-summary(final_scored_data)
+sum(duplicated(scored_data))
 ```
 
 # Check demographics
 ```{r}
-final_scored_data$gender <- factor(final_scored_data$gender, levels=c(1,2,3,4)) # Factor gender
-summary (final_scored_data$gender)
+scored_data$gender <- factor(scored_data$gender, levels=c(1,2,3,4)) # Factor gender
+summary(scored_data$gender)
 ```
 
 
@@ -273,7 +264,7 @@ summary (final_scored_data$gender)
 # In the first step, the data are summarized to get the descriptive statistics.
 #Subsequently, the data are reformatted.
 ```{r}
-descriptives <- final_scored_data %>% 
+descriptives <- scored_data %>% 
   dplyr::summarize(across(c(SES, Age, mean_cra, mean_hcru,sum_cesd, 
                             mean_pss, mean_bsm, sum_pos, 
                             sum_neg, sum_cc, sum_nc, sum_csc, sum_MCQ),
@@ -307,7 +298,7 @@ descriptives <- final_scored_data %>%
 - Select the items from the *raw* or *un-scored* data that belong to the specific scale.
 - calculate alpha and extract raw_alpha from the list the alpha function generates.
 ```{r}
-alpha <- final_scored_data %>%
+alpha <- scored_data %>%
   dplyr::summarize(
     # Replication Block Alphas
     cra_alpha = select(.,starts_with("CRA")) %>% psych::alpha() %>%
@@ -363,8 +354,8 @@ income_plot<-hist(scored_data$SES,
 
 # Mean centre all IVs for regressions with interaction terms
 ```{r}
-centre_data_to_csv <- function(x){
-centred_data <- scored_data %>%
+centre_data_to_csv <- function(scored_data){
+  centred_data <- scored_data %>%
   mutate(CRA_c = scale(mean_cra, center = TRUE, scale = FALSE),
          SES_c = scale(SES, center = TRUE, scale = FALSE),
          PSS_c = scale(mean_pss, center = TRUE, scale = FALSE),
@@ -375,10 +366,12 @@ centred_data <- scored_data %>%
          CC_c = scale(sum_cc, center = TRUE, scale = FALSE),
          NC_c = scale(sum_nc, center = TRUE, scale = FALSE),
          CSC_c = scale(sum_csc, center = TRUE, scale = FALSE),
-         MCQ_c = scale(sum_MCQ, center = TRUE, scale = FALSE))
+         MCQ_c = scale(sum_MCQ, center = TRUE, scale = FALSE))%>%
 
+  # select the scores/final variables used, remove the raw items
+  select(Age, gender, Edu, sum_cesd, SES_c , CRA_c, PSS_c, HCRU_c, BSM_c, POS_c, NEG_c, CC_c, CSC_c, MCQ_c)
 # Save prepared data
-write.csv(centred_data,"prepared_data.csv", row.names = FALSE)
+write.csv(centred_data,"ready_for_analysis.csv", row.names = FALSE)
 
 return(centred_data)
 }
@@ -388,14 +381,14 @@ return(centred_data)
 ```{r}
 # data <- read_csv("prepared_data.csv") # Read csv data from computer
 # or
-data <- centre_data_to_csv(scored_data)
+ready_for_analysis <- centre_data_to_csv(scored_data)
 ```
 
 ##### Hypotheses B1 & B2: Three-way interaction #####
 
 # Rename variables for convenience in modelling
 ```{r}
-data <- data %>% mutate(rename(data,
+data <- ready_for_analysis %>% mutate(rename(ready_for_analysis,
                                 "X" = "CRA_c",
                                 "Y" = "sum_cesd",
                                 "W" = "SES_c",
@@ -417,7 +410,7 @@ data <- data %>% mutate(X.W = X * W,
 
 # Three-way moderation model
 ```{r}
-mod.mod.model = lm(Y ~ X1 + X + W + Z + X*W  + X*Z + W*Z + X*W*Z, data = data)
+mod.mod.model = lm(Y ~ COV + X + W + Z + X*W  + X*Z + W*Z + X*W*Z, data = data)
 ```
 
 # Check model fit
@@ -428,17 +421,12 @@ performance::check_model(mod.mod.model)
 
 # Simple slopes analysis
 ```{r}
-interactions::sim_slopes(mod.mod.model, pred = X, modx=W, mod2 = Z, modxvals = NULL, 
-                         jnalpha = 0.05, digits = 3, n.sd = 1)
+interactions::sim_slopes(mod.mod.model, pred = X, modx=W, mod2 = Z, modxvals = NULL, jnalpha = 0.05, digits = 3, n.sd = 1)
 ```
 
 # Plot simple slopes for interaction
 ```{r}
-interactions::interact_plot(mod.mod.model, pred = X, modx = W, mod2 = Z, centered = "none", 
-              y.label = "Cognitive Reappraisal Ability",
-              x.label = "Socioeconomic Status",
-              interval = TRUE,
-              data = dat)
+interactions::interact_plot(mod.mod.model, pred = X, modx = W, mod2 = Z, centered = "none", y.label = "Cognitive Reappraisal Ability",x.label = "Socioeconomic Status", interval = TRUE, data = data)
 ```
 
 ##### Hypotheses C1 & C2: Moderated Mediation #####
@@ -452,8 +440,7 @@ M ~ a*X
 
 # Outcome being predicted by the model
 Y ~ c1*X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z +
-b1*M + b2*W + b3*Z + b4*M.W + b5*M.Z + b6*W.Z + b7*M.W.Z 
-+ g*COV
+b1*M + b2*W + b3*Z + b4*M.W + b5*M.Z + b6*W.Z + b7*M.W.Z + g*COV
 
 # Covariance: A main predictor's covariance is fixed so it does not 
 # covary with the rest of the variables, since the theory does not explicitely address this
@@ -518,7 +505,8 @@ parameterEstimates(Mod.Med.SEM, remove.nonfree = TRUE)
 # Plot the moderated mediation model
 ```{r}
 # Plot model
-plot_3 = semPaths(Mod.Med.SEM, fixedStyle = 1, layout = "tree", 
+library(semPlot)
+plot = semPaths(Mod.Med.SEM, fixedStyle = 1, layout = "tree", 
                   intercepts = F, label.scale=T, nCharNodes = 0, 
                   sizeMan2=3, sizeMan=7, asize=2, residuals = F, exoCov = T)
 ```
@@ -526,12 +514,12 @@ plot_3 = semPaths(Mod.Med.SEM, fixedStyle = 1, layout = "tree",
 # CLEAN UP #################################################
 
 # Clear environment
-```{r}
+```{r eval=FALSE, include=FALSE}
 rm(list = ls()) 
 ```
 
 # Clear packages
-```{r}
+```{r eval=FALSE, include=FALSE}
 p_unload(all)
 ```
 
