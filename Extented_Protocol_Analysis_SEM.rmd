@@ -190,29 +190,10 @@ return(scored_data)
 }
 ```
 
-# Score the data with temporarily no outliers
+# Score the data with no outliers
 ```{r Score data}
-scored_data <- function_score_data(temp_no_outlier) #score data first, to find outliers among scored data
+scored_data <- function_score_data(no_outlier) #score data first, to find outliers among scored data
 summary(scored_data)
-```
-
-Detect outliers based on *scored* data
-```{r}
-# Mahalanobis for scored data
-mahal <- mahalanobis(scored_data[ , -c(1:69)],
-  colMeans(scored_data[ , -c(1:69)], na.rm=TRUE),
-  cov(scored_data[ , -c(1:69)], use ="pairwise.complete.obs"), , tol = 1e-20)
-
-cutoff <- qchisq(p = 1 - .001, #1 minus alpha
-                 df = ncol(scored_data[ , -c(1:69)])) # number of columns
-```
-
-Drop all outliers detected based on *scored* data
-```{r}
-# Exclusing outliers among scored data based on Mahalanobis
-cutoff
-summary(mahal < cutoff) #notice the direction 
-no_outlier <- subset(scored_data, mahal < cutoff)
 ```
 
 # Summary of cleaned data 
