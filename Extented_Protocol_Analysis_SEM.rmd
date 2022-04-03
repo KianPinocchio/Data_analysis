@@ -1,11 +1,11 @@
 ---
-title: "Data analysis for the extension protocol of study: 
-The interplay of cognitive reappraisal ability, 
-socioeconomic status and mental health."
-author: "Alimohammad Soufizadeh"
-date: "March, 2022"
+Title: "Data analysis for the extension protocol of study: The interplay of cognitive reappraisal ability, socioeconomic status and mental health."
+Author: "Alimohammad Soufizadeh"
+Date: "March, 2022"
 ---
+
 ```{r}
+# Load packages
 pacman::p_load(pacman, tidyverse, kableExtra, psych, lavaan,
                gridExtra,knitr, readxl, papaja, report, mice, VIM)
 ```
@@ -15,8 +15,9 @@ pacman::p_load(pacman, tidyverse, kableExtra, psych, lavaan,
 raw_data <- read_excel("Coded_data.xlsx")
 ```
 
-Change variable names
+
 ```{r}
+# Change variable names
 raw_data <- rename(raw_data, 
                    "duration" = "Duration(Second)", # in seconds
                    "gender" = "Sex")
@@ -24,36 +25,39 @@ raw_data <- rename(raw_data,
 
 # Handling Missing Data
 
+# 1
+```{r eval=FALSE}
 # 1. drop all NA
-```{r eval=FALSE, include=FALSE}
 # Run only if you want to run analysis with dropping all NA
 clean_data <- drop_na(raw_data) 
 ```
 
+# 2
+```{r eval=FALSE}
 # 2. ALT way of handling Missing Data: Drop ALL NA skipping the Age column
-```{r eval=FALSE, include=FALSE}
 clean_data <- raw_data[complete.cases(raw_data[4:69]),]
 ```
 
-OR take the HIGH ROAD to >>
 
-# 3. IMPUTATION
+# 3. Impute missing data
 
-Missing data pattern
 ```{r}
+# Missing data pattern
 missing.pattern<-md.pattern(raw_data)
 ```
 
-# visualising missing data
+
 ```{r}
+# visualise missing data
 library(VIM)
 mice_plot <- aggr(raw_data,numbers=TRUE, sortVars=TRUE,
                     labels=names(raw_data), cex.axis=.7,
                     gap=3, ylab=c("Missing data","Pattern"))
 ```
 
-Percentage of missing data per row
+
 ```{r}
+# Percentage of missing data per row
 no_missing <- raw_data
 percent_missing <- function(x){sum(is.na(x)/length(x)*100)}
 
@@ -61,14 +65,17 @@ missing <- apply(no_missing,1,percent_missing)
 table(missing)
 ```
 
-Look for data to be imputed based on rows
+
+
 ```{r}
+# Look for data to be imputed based on rows
 replace_rows <- subset(no_missing, missing <= 5)
 no_rows <- subset(no_missing, missing > 5)
 ```
 
-Then look for data to be imputed based on columns
+
 ```{r}
+# Then look for data to be imputed based on columns
 missing <- apply(replace_rows, 2, percent_missing)
 table(missing)
 
@@ -76,45 +83,48 @@ replace_columns <- replace_rows %>% select_if(missing<=5)
 no_columns <- replace_rows %>% select_if(missing > 5)
 ```
 
-Visualise missing data AGAIN!!!
-```{r include=FALSE}
+**IMPUTE DATA**
+- Mice easily imputes, taking into account data type.
+```{r Imputation}
+tempnomiss <- mice(replace_columns)
+```
+
+# Visualise missing data AGAIN!!!
+```{r}
 library(VIM)
 mice_plot <- aggr(replace_columns,numbers=TRUE, sortVars=TRUE,
                   labels=names(replace_columns), cex.axis=1,
                   gap=1, ylab=c("Missing data","Pattern"))
 ```
 
-# IMPUTE DATA
-Mice easily imputes, taking into account data type.
-```{r Imputation, message=TRUE, include=FALSE}
-tempnomiss <- mice(replace_columns)
-```
 
-Get all the imputed data
 ```{r}
+# Get all the imputed data
 imputed_columns <- complete(tempnomiss)
 ```
 
-Putting the data we dropped before back together with the rest
+
 ```{r}
+# Putting the data we dropped before back together with the rest
 all_columns <- cbind(no_columns, imputed_columns)
-#all_rows <- rbind(all_columns, no_rows) # Only use if you want all other rows with NA binded as well
+'all_rows <- rbind(all_columns, no_rows)' # Only use if you want all other rows with NA binded as well
 ```
 
-# Prepare for outlier detection
+# Outliers
+
 ```{r}
+# Prepare for outlier detection
 columns = c("id", "Platform", "consent","duration", "Age","gender", "Edu")
 demographics <- subset(all_columns, select = columns) 
 all_columns <- all_columns[ , ! names(all_columns) %in% columns]
 imputed_data <- cbind(demographics, all_columns) # Save all clean data
 ```
 
-# Outliers
 
-## Outliers Mahalanobis 
 
-Degrees of freedom in this case is based on the nr of variables (columns)
-Detect outliers based on *unscored* data
+**Outliers Mahalanobis**
+- Degrees of freedom in this case is based on the nr of variables (columns)
+- Detect outliers based on **unscored** data
 ```{r} 
 # Mahalanobis for unscored data
 mahal <- mahalanobis(imputed_data[ , -c(1:7)],
@@ -125,8 +135,8 @@ cutoff <- qchisq(p = 1 - .001, #1 minus alpha
                  df = ncol(imputed_data[ , -c(1:7)])) # number of columns
 ```
 
-Drop all outliers detected based on *unscored* data
 ```{r}
+# Drop all outliers detected based on *unscored* data
 cutoff
 summary(mahal < cutoff) #notice the direction 
 no_outlier <- subset(imputed_data, mahal < cutoff)
@@ -135,9 +145,9 @@ summary(no_outlier)
 ```
 
 
-# Prepare to score the data with temporarily no outliers
+# Score data
+- Prepare to score the data with temporarily no outliers
 
-Create name list for MCQ scale
 ```{r}
 # Create MCQ subscale variable groups
 mcq_pos <- c("MCQ1","MCQ7","MCQ10",
@@ -156,8 +166,9 @@ mcq_csc <- c("MCQ3","MCQ5","MCQ12",
              "MCQ16","MCQ18","MCQ30")
 ```
 
-Function to Score data
+
 ```{r Function to score data}
+# Function to Score data
 function_score_data <-function(no_outlier){
 
 #save variables in separate data frame
@@ -185,34 +196,35 @@ return(scored_data)
 }
 ```
 
-# Score the data with no outliers
+
 ```{r Score data}
+# Score the data with no outliers
 scored_data <- function_score_data(no_outlier) #score data first, to find outliers among scored data
 ```
 
 # Summary of cleaned data 
-Missing Data & outliers checked
 ```{r}
+# Missing Data & outliers checked
 summary(scored_data)
 ```
 
-## Assumptions Additivity
+# Assumptions
 
 - Additivity is the assumption that each variable adds something to the model
 - You basically do not want to use the same variable twice, as that lowers power
 - Often this is described as multicollinearity (The problem is multicollineartiy). The assumption is called additivity.
 - Mainly, SEM analysis has a lot of correlated variables, you just want to make sure they aren't perfectly correlated
 
-## Assumptions Additivity
 
+# Additivity
 ```{r}
 library(corrplot)
 plot_data <- cbind(scored_data$SES,scored_data[ , -c(1:69)])
 corrplot(cor(plot_data))
 ```
 
-## Assumptions Set Up
 
+# Assumptions Set Up
 ```{r}
 random_variable <- rchisq(nrow(scored_data), 7)
 fake_model <- lm(random_variable ~ ., # What's the difference if I regress on scored_data$sum_cesd ??
@@ -221,22 +233,19 @@ standardized <- rstudent(fake_model) # residuals
 fitvalues <- scale(fake_model$fitted.values) # z-score them
 ```
 
-## Assumptions Linearity
-
+# Linearity
 - We assume the the multivariate relationship between continuous variables is linear (i.e., no curved)
 - There are many ways to test this, but we can use a QQ/PP Plot to examine for linearity
 
 ```{r}
 plot(fake_model, 2)
 ```
-## Assumptions Normality
-
-We expect that the residuals are normally distributed
+# Normality
+- We expect that the residuals are normally distributed
 ```{r}
 hist(standardized)
 ```
-## Assumptions Homogeneity + Homoscedasticity
-
+# Assumptions Homogeneity + Homoscedasticity
 - These assumptions are about equality of the variances
 - Here the assumption is equality in the spread of variance across predicted values 
 
@@ -247,22 +256,23 @@ hist(standardized)
 }
 ```
 
-# Check for duplicates
+
 ```{r}
+# Check for duplicates
 sum(duplicated(scored_data))
 ```
 
-# Check demographics
+
 ```{r}
+# Check demographics
 scored_data$gender <- factor(scored_data$gender, levels=c(1,2,3,4)) # Factor gender
 summary(scored_data$gender)
 ```
 
 
 # Descriptives
-
-# In the first step, the data are summarized to get the descriptive statistics.
-#Subsequently, the data are reformatted.
+- In the first step, the data are summarized to get the descriptive statistics.
+- Subsequently, the data are reformatted.
 ```{r}
 descriptives <- scored_data %>% 
   dplyr::summarize(across(c(SES, Age, mean_cra, mean_hcru,sum_cesd, 
@@ -294,10 +304,11 @@ descriptives <- scored_data %>%
          MCQT = sum_MCQ) # MCQ =Meta Cognitions Questionnaire Total
 ```
 
-# Calculate cronbach’s alphas
+# Cronbach’s alphas
 - Select the items from the *raw* or *un-scored* data that belong to the specific scale.
 - calculate alpha and extract raw_alpha from the list the alpha function generates.
 ```{r}
+# Calculate cronbach’s alphas
 alpha <- scored_data %>%
   dplyr::summarize(
     # Replication Block Alphas
@@ -339,8 +350,9 @@ descriptives <- descriptives %>%
           NC = alpha$nc_alpha, CSC = alpha$csc_alpha, MCQT = alpha$mcq_alpha)
 ```
 
-# make it a nicely formatted table
+# Descriptives table
 ```{r}
+# Make a nicely formatted table
 library(rmarkdown)
 apa_table(descriptives) # is only shown when RMarkdown document is knitted
 ```
@@ -352,8 +364,9 @@ income_plot<-hist(scored_data$SES,
                   xlab="family income category")
 ```
 
-# Mean centre all IVs for regressions with interaction terms
+# Mean centre all IVs
 ```{r}
+# Mean centre all IVs for regressions with interaction terms
 centre_data_to_csv <- function(scored_data){
   centred_data <- scored_data %>%
   mutate(CRA_c = scale(mean_cra, center = TRUE, scale = FALSE),
@@ -377,17 +390,18 @@ return(centred_data)
 }
 ```
 
-# read new data
+
+# read prepared data for analysis
 ```{r}
-# data <- read_csv("prepared_data.csv") # Read csv data from computer
+# data <- read_csv("ready_for_analysis.csv") # Read csv data from computer
 # or
 ready_for_analysis <- centre_data_to_csv(scored_data)
 ```
 
-##### Hypotheses B1 & B2: Three-way interaction #####
+# Hypotheses B1 & B2: Three-way interaction
 
-# Rename variables for convenience in modelling
 ```{r}
+# Rename variables for convenience in modelling
 data <- ready_for_analysis %>% mutate(rename(ready_for_analysis,
                                 "X" = "CRA_c",
                                 "Y" = "sum_cesd",
@@ -396,7 +410,8 @@ data <- ready_for_analysis %>% mutate(rename(ready_for_analysis,
                                 "COV" = "PSS_c",
                                "M" = "NEG_c"))
 ```
-# Create interaction terms
+
+Create interaction terms
 ```{r}
 # Create interaction terms
 data <- data %>% mutate(X.W = X * W,
@@ -411,6 +426,7 @@ data <- data %>% mutate(X.W = X * W,
 # Three-way moderation model
 ```{r}
 mod.mod.model = lm(Y ~ COV + X + W + Z + X*W  + X*Z + W*Z + X*W*Z, data = data)
+summary(mod.mod.model)
 ```
 
 # Check model fit
@@ -429,10 +445,10 @@ interactions::sim_slopes(mod.mod.model, pred = X, modx=W, mod2 = Z, modxvals = N
 interactions::interact_plot(mod.mod.model, pred = X, modx = W, mod2 = Z, centered = "none", y.label = "Cognitive Reappraisal Ability",x.label = "Socioeconomic Status", interval = TRUE, data = data)
 ```
 
-##### Hypotheses C1 & C2: Moderated Mediation #####
+# Hypotheses C1 & C2: Moderated Mediation
 
-# Model
 ```{r}
+# The Model
 MOD.MED.model <-
 "
 # Mediator
@@ -484,16 +500,20 @@ prop.mediated.above := indirect.above / total.above
 "
 ```
 
-Fit the model
+
+
 ```{r}
+# Fit the model
 Mod.Med.SEM <- sem(model = MOD.MED.model,
                    data = data,
                    se = "bootstrap",
                    bootstrap = 200) # do 5000 when actually running the code
 ```
 
-Model summary
+
+
 ```{r}
+# Model summary
 summary(Mod.Med.SEM, fit.measures = FALSE, standardize = TRUE, rsquare = TRUE)
 ```
 
@@ -511,19 +531,19 @@ plot = semPaths(Mod.Med.SEM, fixedStyle = 1, layout = "tree",
                   sizeMan2=3, sizeMan=7, asize=2, residuals = F, exoCov = T)
 ```
 
-# CLEAN UP #################################################
+# CLEAN UP
 
+```{r}
 # Clear environment
-```{r eval=FALSE, include=FALSE}
 rm(list = ls()) 
 ```
 
-# Clear packages
-```{r eval=FALSE, include=FALSE}
+```{r}
+# Clear packages 
 p_unload(all)
 ```
 
-# Clear console
 ```{r}
+# Clear console
 cat("\014")
 ```
