@@ -18,7 +18,7 @@ raw_data <- read_excel("Coded_data.xlsx")
 Change variable names
 ```{r}
 raw_data <- rename(raw_data, 
-                   "duration" = "Duration(Second)",
+                   "duration" = "Duration(Second)", # in seconds
                    "gender" = "Sex")
 ```
 
@@ -26,11 +26,19 @@ raw_data <- rename(raw_data,
 
 # 1. drop all NA
 ```{r eval=FALSE, include=FALSE}
-clean_data <- drop_na(raw_data)
+# Run only if you want to run analysis with dropping all NA
+clean_data <- drop_na(raw_data) 
 ```
 
+# 2. ALT way of handling Missing Data: Drop ALL NA skipping the Age column
+```{r eval=FALSE, include=FALSE}
+clean_data <- raw_data[complete.cases(raw_data[4:69]),]
+```
 
-OR take the HIGH ROAD to IMPUTATION
+OR take the HIGH ROAD to >>
+
+# 3. IMPUTATION
+
 Missing data pattern
 ```{r}
 missing.pattern<-md.pattern(raw_data)
@@ -53,13 +61,13 @@ missing <- apply(no_missing,1,percent_missing)
 table(missing)
 ```
 
-Rows to be imputed
+Look for data to be imputed based on rows
 ```{r}
 replace_rows <- subset(no_missing, missing <= 5)
 no_rows <- subset(no_missing, missing > 5)
 ```
 
-Missing columns
+Then look for data to be imputed based on columns
 ```{r}
 missing <- apply(replace_rows, 2, percent_missing)
 table(missing)
@@ -69,48 +77,68 @@ no_columns <- replace_rows %>% select_if(missing > 5)
 ```
 
 Visualise missing data AGAIN!!!
-
 ```{r include=FALSE}
 library(VIM)
-mice_plot_1 <- aggr(replace_columns,numbers=TRUE, sortVars=TRUE,
+mice_plot <- aggr(replace_columns,numbers=TRUE, sortVars=TRUE,
                   labels=names(replace_columns), cex.axis=1,
                   gap=1, ylab=c("Missing data","Pattern"))
 ```
 
 # IMPUTE DATA
 Mice easily imputes, taking into account data type.
-```{r message=TRUE, include=FALSE}
+```{r Imputation, message=TRUE, include=FALSE}
 tempnomiss <- mice(replace_columns)
 ```
 
 Get all the imputed data
 ```{r}
-fixed_columns <- complete(tempnomiss)
+imputed_columns <- complete(tempnomiss)
 ```
 
 Putting the data we dropped before back together with the rest
 ```{r}
-all_columns <- cbind(no_columns, fixed_columns)
+all_columns <- cbind(no_columns, imputed_columns)
 #all_rows <- rbind(all_columns, no_rows) # Only use if you want all other rows with NA binded as well
 ```
 
-3. ALT way of handling Missing Data: Drop ALL NA skipping the Age column
-```{r eval=FALSE, include=FALSE}
-clean_data <- raw_data[complete.cases(raw_data[4:69]),]
-```
-
 # Prepare for outlier detection
-
 ```{r}
-columns = c("Age","gender","id","consent", "Edu", "Platform", "duration")
+columns = c("id", "Platform", "consent","duration", "Age","gender", "Edu")
 demographics <- subset(all_columns, select = columns) 
 all_columns <- all_columns[ , ! names(all_columns) %in% columns]
-clean_data <- cbind(all_columns, demographics)
+imputed_data <- cbind(demographics, all_columns) # Save all clean data
 ```
 
+# Outliers
+
+## Outliers Mahalanobis 
+
+Degrees of freedom in this case is based on the nr of variables (columns)
+Detect outliers based on *unscored* data
+```{r} 
+# Mahalanobis for unscored data
+mahal <- mahalanobis(imputed_data[ , -c(1:7)],
+  colMeans(imputed_data[ , -c(1:7)], na.rm=TRUE),
+  cov(imputed_data[ , -c(1:7)], use ="pairwise.complete.obs"))
+
+cutoff <- qchisq(p = 1 - .001, #1 minus alpha
+                 df = ncol(imputed_data[ , -c(1:7)])) # number of columns
+```
+
+Drop all outliers detected based on *unscored* data
 ```{r}
-#Score questionnaires:
-function_score_data <-function(data){
+cutoff
+summary(mahal < cutoff) #notice the direction 
+temp_no_outlier <- subset(imputed_data, mahal < cutoff)
+
+summary(temp_no_outlier)
+```
+
+
+# Prepare to score the data with temporarily no outliers
+
+Create name list for MCQ scale
+```{r}
 # Create MCQ subscale variable groups
 mcq_pos <- c("MCQ1","MCQ7","MCQ10",
              "MCQ19","MCQ23","MCQ28")
@@ -126,10 +154,14 @@ mcq_nc <- c("MCQ6","MCQ13","MCQ20",
 
 mcq_csc <- c("MCQ3","MCQ5","MCQ12",
              "MCQ16","MCQ18","MCQ30")
+```
 
+Function to Score data
+```{r Function to score data}
+function_score_data <-function(temp_no_outlier){
 
 #save variables in separate data frame
-scored_data <- no_outliers %>%
+scored_data <- temp_no_outlier %>%
   
   #row mean of the selected columns
   mutate(across(c("PSS2", "PSS3"), ~{6 - .}), # recode PSS items 2 & 3 (6 - response)
@@ -152,48 +184,43 @@ scored_data <- no_outliers %>%
   
   
   # select the scores/final variables used, remove the raw items
-  select(id, Age, gender, SES,mean_cra, mean_hcru,
-         sum_cesd, mean_pss, mean_bsm, sum_pos, sum_neg, sum_cc, sum_nc, sum_csc, sum_MCQ)
+  #select(id, Age, gender, SES,mean_cra, mean_hcru,
+  #       sum_cesd, mean_pss, mean_bsm, sum_pos, sum_neg, sum_cc, sum_nc, sum_csc, sum_MCQ)
 return(scored_data)
 }
 ```
 
-# Outliers
-
-## Outliers Mahalanobis 
-degrees of freedom in this case is based on the nr of variables (columns)
-```{r} 
-# Mahalanobis for raw data
-mahal <- mahalanobis(clean_data[ , -c(63:69)],
-  colMeans(clean_data[ , -c(63:69)], na.rm=TRUE),
-  cov(clean_data[ , -c(63:69)], use ="pairwise.complete.obs"))
-
-cutoff <- qchisq(p = 1 - .001, #1 minus alpha
-                 df = ncol(clean_data[ , -c(63:69)])) # number of columns
+# Score the data with temporarily no outliers
+```{r Score data}
+scored_data <- function_score_data(temp_no_outlier) #score data first, to find outliers among scored data
+summary(scored_data)
 ```
 
-```{r}
-cutoff
-summary(mahal < cutoff) #notice the direction 
-clean_data <- subset(clean_data, mahal < cutoff)
-```
-
+Detect outliers based on *scored* data
 ```{r}
 # Mahalanobis for scored data
-scored_data <- function_score_data(clean_data) #score data first, to find outliers among scored data
-mahal <- mahalanobis(scored_data[ , -c(1:3)],
-  colMeans(scored_data[ , -c(1:3)], na.rm=TRUE),
-  cov(scored_data[ , -c(1:3)], use ="pairwise.complete.obs"), tol = 1e-20)
+mahal <- mahalanobis(scored_data[ , -c(1:69)],
+  colMeans(scored_data[ , -c(1:69)], na.rm=TRUE),
+  cov(scored_data[ , -c(1:69)], use ="pairwise.complete.obs"), , tol = 1e-20)
 
 cutoff <- qchisq(p = 1 - .001, #1 minus alpha
-                 df = ncol(scored_data[ , -c(1:3)])) # number of columns
+                 df = ncol(scored_data[ , -c(1:69)])) # number of columns
 ```
 
+Drop all outliers detected based on *scored* data
 ```{r}
 # Exclusing outliers among scored data based on Mahalanobis
 cutoff
 summary(mahal < cutoff) #notice the direction 
-clean_data <- subset(scored_data, mahal < cutoff)
+no_outlier <- subset(scored_data, mahal < cutoff)
+```
+
+# Summary of cleaned data 
+Missing Data & outliers checked
+```{r}
+summary(no_outlier)
+
+final_scored_data <- no_outlier
 ```
 
 ## Assumptions Additivity
@@ -207,15 +234,16 @@ clean_data <- subset(scored_data, mahal < cutoff)
 
 ```{r}
 library(corrplot)
-corrplot(cor(clean_data[ , -c(1:3)]))
+plot_data <- cbind(final_scored_data$SES,final_scored_data[ , -c(1:69)])
+corrplot(cor(plot_data))
 ```
 
 ## Assumptions Set Up
 
 ```{r}
-random_variable <- rchisq(nrow(clean_data), 7)
-fake_model <- lm(random_variable ~ ., # What's the difference if I regress on clean_data$sum_cesd ??
-                 data = clean_data[ , -c(1:3)])
+random_variable <- rchisq(nrow(final_scored_data), 7)
+fake_model <- lm(random_variable ~ ., # What's the difference if I regress on scored_data$sum_cesd ??
+                 data = final_scored_data[ , -c(1:69)])
 standardized <- rstudent(fake_model) # residuals
 fitvalues <- scale(fake_model$fitted.values) # z-score them
 ```
@@ -230,17 +258,13 @@ plot(fake_model, 2)
 ```
 ## Assumptions Normality
 
-- We expect that the residuals are normally distributed
-- Not that the *sample* is normally distributed 
-- Generally, SEM requires a large sample size, thus, buffering against normality deviations
-
+We expect that the residuals are normally distributed
 ```{r}
 hist(standardized)
 ```
 ## Assumptions Homogeneity + Homoscedasticity
 
 - These assumptions are about equality of the variances
-- We assume equal variances between groups for things like t-tests, ANOVA
 - Here the assumption is equality in the spread of variance across predicted values 
 
 ```{r}
@@ -252,17 +276,17 @@ hist(standardized)
 
 # Check for duplicates
 ```{r}
-sum(duplicated(clean_data))
+sum(duplicated(final_scored_data))
 ```
 # Data summary
 ```{r}
-summary(clean_data)
+summary(final_scored_data)
 ```
 
 # Check demographics
 ```{r}
-clean_data$gender <- factor(clean_data$gender, levels=c(1,2,3,4))
-summary (clean_data$gender)
+final_scored_data$gender <- factor(final_scored_data$gender, levels=c(1,2,3,4)) # Factor gender
+summary (final_scored_data$gender)
 ```
 
 
@@ -271,7 +295,7 @@ summary (clean_data$gender)
 # In the first step, the data are summarized to get the descriptive statistics.
 #Subsequently, the data are reformatted.
 ```{r}
-descriptives <- scored_data %>% 
+descriptives <- final_scored_data %>% 
   dplyr::summarize(across(c(SES, Age, mean_cra, mean_hcru,sum_cesd, 
                             mean_pss, mean_bsm, sum_pos, 
                             sum_neg, sum_cc, sum_nc, sum_csc, sum_MCQ),
@@ -302,10 +326,10 @@ descriptives <- scored_data %>%
 ```
 
 # Calculate cronbach’s alphas
-# Select the items from the raw data that belong to the specific scale.
-# calculate alpha and extract raw_alpha from the list the alpha function generates.
+- Select the items from the *raw* or *un-scored* data that belong to the specific scale.
+- calculate alpha and extract raw_alpha from the list the alpha function generates.
 ```{r}
-alpha <- clean_data %>%
+alpha <- final_scored_data %>%
   dplyr::summarize(
     # Replication Block Alphas
     cra_alpha = select(.,starts_with("CRA")) %>% psych::alpha() %>%
@@ -334,7 +358,10 @@ alpha <- clean_data %>%
       pluck("total", "raw_alpha"),
     mcq_alpha = select(.,all_of(mcq_csc)) %>% psych::alpha() %>%
       pluck("total", "raw_alpha"))
+```
 
+
+```{r}
 # add alphas as extra row to the descriptives table
 descriptives <- descriptives %>%
   add_row(Summary = "alpha", SES = NA, CRA = alpha$cra_alpha, HCRU = alpha$hcru_alpha,
@@ -342,6 +369,7 @@ descriptives <- descriptives %>%
           POS = alpha$pos_alpha, NEG = alpha$neg_alpha, CC = alpha$cc_alpha,
           NC = alpha$nc_alpha, CSC = alpha$csc_alpha, MCQT = alpha$mcq_alpha)
 ```
+
 # make it a nicely formatted table
 ```{r}
 library(rmarkdown)
@@ -387,7 +415,7 @@ data <- centre_data_to_csv(scored_data)
 
 ##### Hypotheses B1 & B2: Three-way interaction #####
 
-# Rename variables
+# Rename variables for convenience in modelling
 ```{r}
 data <- data %>% mutate(rename(data,
                                 "X" = "CRA_c",
@@ -411,24 +439,24 @@ data <- data %>% mutate(X.W = X * W,
 
 # Three-way moderation model
 ```{r}
-mod.mod.model = lm(Y ~ X1 + X + W + Z + X*W  + X*Z + W*Z + X*W*Z, data = dat)
+mod.mod.model = lm(Y ~ X1 + X + W + Z + X*W  + X*Z + W*Z + X*W*Z, data = data)
 ```
 
 # Check model fit
 ```{r}
-performance::check_model(model_1)
+performance::check_model(mod.mod.model)
 ```
 
 
 # Simple slopes analysis
 ```{r}
-interactions::sim_slopes(model_1, pred = X, modx=W, mod2 = Z, modxvals = NULL, 
+interactions::sim_slopes(mod.mod.model, pred = X, modx=W, mod2 = Z, modxvals = NULL, 
                          jnalpha = 0.05, digits = 3, n.sd = 1)
 ```
 
 # Plot simple slopes for interaction
 ```{r}
-interactions::interact_plot(model_1, pred = X, modx = W, mod2 = Z, centered = "none", 
+interactions::interact_plot(mod.mod.model, pred = X, modx = W, mod2 = Z, centered = "none", 
               y.label = "Cognitive Reappraisal Ability",
               x.label = "Socioeconomic Status",
               interval = TRUE,
@@ -493,7 +521,7 @@ prop.mediated.above := indirect.above / total.above
 
 Fit the model
 ```{r}
-Mod.Med.SEM <- sem(model = med.mod3.model,
+Mod.Med.SEM <- sem(model = MOD.MED.model,
                    data = data,
                    se = "bootstrap",
                    bootstrap = 200) # do 5000 when actually running the code
