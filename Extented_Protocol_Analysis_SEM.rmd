@@ -129,9 +129,9 @@ Drop all outliers detected based on *unscored* data
 ```{r}
 cutoff
 summary(mahal < cutoff) #notice the direction 
-temp_no_outlier <- subset(imputed_data, mahal < cutoff)
+no_outlier <- subset(imputed_data, mahal < cutoff)
 
-summary(temp_no_outlier)
+summary(no_outlier)
 ```
 
 
@@ -158,10 +158,10 @@ mcq_csc <- c("MCQ3","MCQ5","MCQ12",
 
 Function to Score data
 ```{r Function to score data}
-function_score_data <-function(temp_no_outlier){
+function_score_data <-function(no_outlier){
 
 #save variables in separate data frame
-scored_data <- temp_no_outlier %>%
+scored_data <- no_outlier %>%
   
   #row mean of the selected columns
   mutate(across(c("PSS2", "PSS3"), ~{6 - .}), # recode PSS items 2 & 3 (6 - response)
@@ -193,15 +193,12 @@ return(scored_data)
 # Score the data with no outliers
 ```{r Score data}
 scored_data <- function_score_data(no_outlier) #score data first, to find outliers among scored data
-summary(scored_data)
 ```
 
 # Summary of cleaned data 
 Missing Data & outliers checked
 ```{r}
-summary(no_outlier)
-
-final_scored_data <- no_outlier
+summary(scored_data)
 ```
 
 ## Assumptions Additivity
