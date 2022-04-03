@@ -240,6 +240,8 @@ fitvalues <- scale(fake_model$fitted.values) # z-score them
 ```{r}
 plot(fake_model, 2)
 ```
+
+
 # Normality
 - We expect that the residuals are normally distributed
 ```{r}
