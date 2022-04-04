@@ -20,13 +20,13 @@ raw_data <- rename(raw_data,
 # Exclusion crtieria
 # Based on Troy et al's (2017) criteria
 # 1. exclude all who didn't complete the survey or had missing data
-clean_data <- drop_na(raw_data)
+no_missing <- drop_na(raw_data)
 
 # 2. exclude participants with zero variance among their answers
-clean_data <- clean_data[apply(clean_data[, -c(1:4)], 1, var) != 0, ]
+no_zero_var <- no_missing[apply(no_missing[, -c(1:4)], 1, var) != 0, ]
 
 # 3. exclude participants who took less than 3 minutes (180 seconds) to complete the survey
-clean_data <- clean_data %>% filter(duration > 180)
+clean_data <- no_zero_var %>% filter(duration > 180)
 
 # Data summary
 summary(clean_data)
