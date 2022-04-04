@@ -17,6 +17,10 @@ raw_data <- rename(raw_data,
                    "duration" = "Duration(Second)",
                    "gender" = "Sex")
 
+# Raw data
+# summarise raw data
+summary(raw_data)
+
 # Exclusion crtieria
 # Based on Troy et al's (2017) criteria
 # 1. exclude all who didn't complete the survey or had missing data

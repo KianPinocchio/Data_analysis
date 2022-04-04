@@ -23,6 +23,12 @@ raw_data <- rename(raw_data,
                    "gender" = "Sex")
 ```
 
+# Raw data
+```{r}
+# summarise raw data
+summary(raw_data)
+```
+
 # Exclusion crtieria
 - Based on Troy et al's (2017) criteria
 ```{r}

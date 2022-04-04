@@ -1,0 +1,276 @@
+---
+Title: "Data analysis for the extension protocol of study: The interplay of cognitive reappraisal ability, socioeconomic status and mental health."
+Author: "Alimohammad Soufizadeh"
+Date: "March, 2022"
+---
+
+```{r}
+# Load packages
+pacman::p_load(pacman, tidyverse, kableExtra, psych, lavaan,
+               gridExtra,knitr, readxl, papaja, report, mice, VIM)
+```
+
+# read all data
+```{r}
+raw_data <- read_excel("Coded_data_2.xlsx")
+```
+
+
+```{r}
+# Change variable names
+raw_data <- rename(raw_data, 
+                   "duration" = "Duration(Second)", # in seconds
+                   "gender" = "Sex")
+```
+
+# Raw data
+```{r}
+# summarise raw data
+summary(raw_data)
+```
+
+# Exclusion crtieria
+- Based on Troy et al's (2017) criteria
+```{r}
+# 1. exclude all who didn't complete the survey or had missing data
+no_missing <- drop_na(raw_data)
+```
+
+```{r}
+# 2. exclude participants with zero variance among their answers
+no_zero_var <- no_missing[apply(no_missing[, -c(1:4)], 1, var) != 0, ]
+```
+
+```{r}
+# 3. exclude participants who took less than 3 minutes (180 seconds) to complete the survey
+clean_data <- no_zero_var %>% filter(duration >= 180)
+```
+
+# Data summary
+```{r}
+summary(clean_data)
+```
+
+# Score data
+```{r Function to score data}
+# Function to Score data
+function_score_data <-function(clean_data){
+
+#save variables in separate data frame
+scored_data <- clean_data %>%
+  
+  #row mean of the selected columns
+  mutate(across(c("PSS2", "PSS3"), ~{6 - .}), # recode PSS items 2 & 3 (6 - response)
+         across(c("BSM1", "BSM3", "BSM7", "BSM8"), ~{8 - .}), # first recode BSM items 1, 3, 7, 8 (8 - response)
+         mean_cra = rowMeans(select(., starts_with("CRA"))),
+         mean_hcru = rowMeans(select(., starts_with("HCRU"))),
+         mean_pss = rowMeans(select(., starts_with("PSS"))),
+         
+         mean_bsm = rowMeans(select(., starts_with("BSM"))),
+         #for cesd, we need the sum
+         sum_cesd = rowSums(select(., starts_with("CES_D"))))%>%
+return(scored_data)
+}
+```
+
+
+```{r Score data}
+# Score the data with no outliers
+scored_data <- function_score_data(clean_data) #score data first, to find outliers among scored data
+```
+
+# Summary of cleaned data 
+```{r}
+# Missing Data & outliers checked
+summary(scored_data)
+```
+
+
+```{r}
+# Check for duplicates
+sum(duplicated(scored_data))
+```
+
+
+```{r}
+# Check demographics
+# 1 = male, 2 = female, 3 = non-binary, 4 = don't want to answer
+scored_data$gender <- factor(scored_data$gender, levels=c(1,2,3,4)) # Factor gender
+summary(scored_data$gender)
+```
+
+
+# Descriptives
+- In the first step, the data are summarized to get the descriptive statistics.
+- Subsequently, the data are reformatted.
+```{r}
+descriptives <- scored_data %>% 
+  dplyr::summarize(across(c(SES, Age, mean_cra, mean_hcru,sum_cesd, 
+                            mean_pss, mean_bsm),
+                          list(mean = mean, sd = sd, min = min, max = max))) %>%
+  
+  # bring everything in long format
+  pivot_longer(everything(), names_to = "name") %>%
+  
+  # separate names at last underscore
+  separate(name, into = c("name","descriptive"), sep = "_(?=[^_]+$)") %>%
+  
+  # get into a bit wider format again
+  pivot_wider(names_from = name, values_from = value) %>%
+  
+  # rename to have nicer column names
+  rename(Summary = descriptive,
+         CRA = mean_cra,  #
+         HCRU = mean_hcru, #
+         PSS = mean_pss,  #
+         CESD = sum_cesd, #
+         BSM = mean_bsm) #
+```
+
+# Cronbach’s alphas
+- Select the items from the *raw* or *un-scored* data that belong to the specific scale.
+- calculate alpha and extract raw_alpha from the list the alpha function generates.
+```{r}
+# Calculate cronbach’s alphas
+alpha <- scored_data %>%
+  dplyr::summarize(
+    # Replication Block Alphas
+    cra_alpha = select(.,starts_with("CRA")) %>% psych::alpha() %>%
+      pluck("total", "raw_alpha"), # extract total and then raw_alpha from list
+    hcru_alpha = select(.,starts_with("HCRU")) %>% psych::alpha() %>%
+      pluck("total", "raw_alpha"),
+    cesd_alpha = select(.,starts_with("CES_D")) %>% psych::alpha() %>%
+      pluck("total", "raw_alpha"),
+    pss_alpha = select(.,starts_with("PSS")) %>% psych::alpha(check.keys=TRUE) %>%   pluck("total", "raw_alpha"),
+    
+    # BSM Alphas
+    BSM_alpha = select(.,starts_with("BSM")) %>% psych::alpha(check.keys=TRUE) %>%   pluck("total", "raw_alpha"))
+```
+
+
+```{r}
+# add alphas as extra row to the descriptives table
+descriptives <- descriptives %>%
+  add_row(Summary = "alpha", SES = NA, CRA = alpha$cra_alpha, HCRU = alpha$hcru_alpha,
+          PSS = alpha$pss_alpha, CESD = alpha$cesd_alpha, BSM = alpha$BSM_alpha)
+```
+
+# Descriptives table
+```{r}
+# Make a nicely formatted table
+library(rmarkdown)
+apa_table(descriptives) # is only shown when RMarkdown document is knitted
+```
+
+# Plot monthly family income
+```{r}
+income_plot<-hist(scored_data$SES,
+                  main="Family income distribution",
+                  xlab="family income category")
+```
+
+# Mean centre all IVs
+```{r}
+# Mean centre all IVs for regressions with interaction terms
+centre_data_to_csv <- function(scored_data){
+  centred_data <- scored_data %>%
+  mutate(CRA_c = scale(mean_cra, center = TRUE, scale = FALSE),
+         SES_c = scale(SES, center = TRUE, scale = FALSE),
+         PSS_c = scale(mean_pss, center = TRUE, scale = FALSE),
+         HCRU_c = scale(mean_hcru, center = TRUE, scale = FALSE),
+         BSM_c = scale(mean_bsm, center = TRUE, scale = FALSE))%>%
+
+  # select the scores/final variables used, remove the raw items
+  select(Age, gender, Edu, sum_cesd, SES_c , CRA_c, PSS_c, HCRU_c, BSM_c)
+# Save prepared data
+write.csv(centred_data,"ready_for_analysis.csv", row.names = FALSE)
+
+return(centred_data)
+}
+```
+
+
+# read prepared data for analysis
+```{r}
+# data <- read_csv("ready_for_analysis.csv") # Read csv data from computer
+# or
+ready_for_analysis <- centre_data_to_csv(scored_data)
+```
+
+# Hypotheses B1 & B2: Three-way interaction
+
+```{r}
+# Rename variables for convenience in modelling
+data <- ready_for_analysis %>% mutate(rename(ready_for_analysis,
+                                "X" = "CRA_c",
+                                "Y" = "sum_cesd",
+                                "W" = "SES_c",
+                                "Z" = "BSM_c",
+                                "COV" = "PSS_c"))
+```
+
+Create interaction terms
+```{r}
+# Create interaction terms
+data <- data %>% mutate(X.W = X * W,
+                        X.Z = X * Z,
+                        W.Z = W * Z,
+                        X.W.Z = X * W * Z)
+```
+
+```{r}
+# Original model 
+org.model <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c, data = data)
+summary(org.model)
+```
+
+# Check org.model fit
+```{r}
+performance::check_model(org.model)
+```
+
+# Three-way moderation model
+```{r}
+# For simplicity of the math
+mod.mod.model = lm(Y ~ COV + X + W + Z + X*W  + X*Z + W*Z + X*W*Z, data = data)
+
+# same model with variable names
+mod.mod.model = lm(sum_cesd ~ PSS_c + CRA_c + SES_c + BSM_c + CRA_c*SES_c  + CRA_c*BSM_c + SES_c*BSM_c + CRA_c*SES_c*BSM_c, data = data)
+summary(mod.mod.model)
+```
+
+# Check mod.mod.model fit
+```{r}
+performance::check_model(mod.mod.model)
+```
+
+# Simple slopes analysis
+```{r}
+interactions::sim_slopes(mod.mod.model, pred = CRA_c, modx=SES_c, mod2 = BSM_c, modxvals = NULL, jnalpha = 0.05, digits = 3, n.sd = 1)
+```
+
+# Plot simple slopes for interaction
+```{r}
+interactions::interact_plot(mod.mod.model, pred = CRA_c, modx = SES_c, mod2 = BSM_c, centered = "none", y.label = "Cognitive Reappraisal Ability",x.label = "Socioeconomic Status", interval = TRUE, data = data)
+```
+
+```{r}
+# compare models
+anova(org.model,mod.mod.model)
+```
+
+# CLEAN UP
+```{r}
+# Clear environment
+rm(list = ls()) 
+```
+
+```{r}
+# Clear packages 
+p_unload(all)
+```
+
+```{r}
+# Clear console
+cat("\014")
+```
