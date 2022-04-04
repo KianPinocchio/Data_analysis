@@ -26,7 +26,7 @@ no_missing <- drop_na(raw_data)
 no_zero_var <- no_missing[apply(no_missing[, -c(1:4)], 1, var) != 0, ]
 
 # 3. exclude participants who took less than 3 minutes (180 seconds) to complete the survey
-clean_data <- no_zero_var %>% filter(duration > 180)
+clean_data <- no_zero_var %>% filter(duration >= 180)
 
 # Data summary
 summary(clean_data)
