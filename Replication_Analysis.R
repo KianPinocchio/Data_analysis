@@ -10,32 +10,32 @@ pacman::p_load(pacman, tidyverse, kableExtra, psych,
                rmarkdown, knitr, patchwork, readxl, papaja, report)
 
 # read all data
-raw_data <- read_excel("Coded_Combined.xlsx") #save the excel file as a dataframe named "all_data"
+raw_data <- read_excel("Coded_data.xlsx") #save the excel file as a dataframe named "all_data"
 
 # Change column names
 raw_data <- rename(raw_data, 
                    "duration" = "Duration(Second)",
                    "gender" = "Sex")
 
-# 1. drop all NA
+# Exclusion crtieria
+# Based on Troy et al's (2017) criteria
+# 1. exclude all who didn't complete the survey or had missing data
 clean_data <- drop_na(raw_data)
 
-# Check for duplicates
-sum(duplicated(clean_data)) # No duplicates
+# 2. exclude participants with zero variance among their answers
+clean_data <- clean_data[apply(clean_data[, -c(1:4)], 1, var) != 0, ]
+
+# 3. exclude participants who took less than 3 minutes (180 seconds) to complete the survey
+clean_data <- clean_data %>% filter(duration > 180)
 
 # Data summary
 summary(clean_data)
-
-# Rename columns
-clean_data <- rename(clean_data, "gender" = "Sex")
 
 # Check demographics
 clean_data$gender <- factor(clean_data$gender, levels=c(1,2,3,4))
 summary (clean_data$gender)
 
-
 #Score questionnaires:
-
 #save variables in separate data frame
 scored_data <- clean_data %>%
   
@@ -145,7 +145,7 @@ interaction_plot <- interactions::interact_plot(model = fit,
                                                 y.label= "Depressive Symptoms",
                                                 legend.main = "family income")
 
-# CLEAN UP #################################################
+# CLEAN UP #
 
 # Clear environment
 rm(list = ls()) 
@@ -155,3 +155,8 @@ p_unload(all)
 
 # Clear console
 cat("\014")
+
+# References
+# Troy, A. S., Ford, B. Q., McRae, K., Zarolia, P., & Mauss, I. B. (2017). 
+# Change the things you can: Emotion regulation is more beneficial for people from lower than from higher socioeconomic status. Emotion, 17(1), 141–154. 
+# https://doi.org/10.1037/emo0000210

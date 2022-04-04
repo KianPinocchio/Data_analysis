@@ -16,21 +16,28 @@ pacman::p_load(pacman, tidyverse, kableExtra, psych, janitor, car, performance, 
 raw_data <- read_excel("Coded_data.xlsx")
 ```
 
-# Handling Missing Data
 ```{r}
-# 1. drop all NA
+# Change column names
+raw_data <- rename(raw_data, 
+                   "duration" = "Duration(Second)",
+                   "gender" = "Sex")
+```
+
+# Exclusion crtieria
+- Based on Troy et al's (2017) criteria
+```{r}
+# 1. exclude all who didn't complete the survey or had missing data
 clean_data <- drop_na(raw_data)
 ```
 
-
 ```{r}
-# OR 2. Drop NA skipping Age column
-# clean_data <- raw_data[complete.cases(raw_data[4:69]),]
+# 2. exclude participants with zero variance among their answers
+clean_data <- clean_data[apply(clean_data[, -c(1:4)], 1, var) != 0, ]
 ```
 
-# Check for duplicates
 ```{r}
-sum(duplicated(clean_data))
+# 3. exclude participants who took less than 3 minutes (180 seconds) to complete the survey
+clean_data <- clean_data %>% filter(duration <= 1)
 ```
 
 # Data summary
@@ -38,16 +45,10 @@ sum(duplicated(clean_data))
 summary(clean_data)
 ```
 
-```{r}
-# Rename columns
-clean_data <- rename(clean_data, "gender" = "Sex")
-```
-
 # Check demographics
 ```{r}
 clean_data$gender <- factor(clean_data$gender, levels=c(1,2,3,4))
-summary (clean_data$gender)
-summary (clean_data$Age)
+summary(clean_data$gender)
 ```
 
 #save variables in separate data frame
