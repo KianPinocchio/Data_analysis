@@ -1,63 +1,55 @@
----
-title: "Data analysis examining hypotheses B1 and B2 of the study: The interplay of cognitive reappraisal ability, socioeconomic status and mental health."
-author: "Alimohammad Soufizadeh"
-date: "March, 2022"
----
 
-```{r}
+# title: "Replication of the data analysis in Study1 by Troy et al. (2017) with an Iranian sample."
+# author: "Alimohammad Soufizadeh"
+# date: "March, 2022"
+
+## ----------------------------------------------------------------------------------------
 # Load packages
 pacman::p_load(pacman, tidyverse, kableExtra, psych, interactions,jtools,
                gridExtra,knitr, readxl, papaja, rmarkdown)
-```
 
-# Read raw data
-```{r}
+
+## ----------------------------------------------------------------------------------------
 raw_data <- read_excel("Coded_data.xlsx")
-```
 
 
-```{r}
+## ----------------------------------------------------------------------------------------
 # Change variable names
 raw_data <- rename(raw_data, 
                    "duration" = "Duration(Second)", # in seconds
                    "gender" = "Sex")
-```
 
-# Raw data
-```{r}
+
+## ----------------------------------------------------------------------------------------
 # summarise raw data
 summary(raw_data)
-```
 
-# Exclusion crtieria
-- Based on Troy et al's (2017) criteria
-```{r}
+
+## ----------------------------------------------------------------------------------------
 # 1. exclude all who didn't complete the survey or had missing data
 no_missing <- drop_na(raw_data)
-```
 
-```{r}
+
+## ----------------------------------------------------------------------------------------
 # 2. exclude participants with zero variance among their answers
 no_zero_var <- no_missing[apply(no_missing[, -c(1:4)], 1, var) != 0, ]
-```
 
-```{r}
+
+## ----------------------------------------------------------------------------------------
 # 3. exclude participants who took less than 3 minutes (180 seconds) to complete the survey
 clean_data <- no_zero_var %>% filter(duration >= 180)
-```
 
-```{r}
+
+## ----------------------------------------------------------------------------------------
 # Check for duplicates
 sum(duplicated(clean_data))
-```
 
-# Data summary
-```{r}
+
+## ----------------------------------------------------------------------------------------
 summary(clean_data)
-```
 
-# Score data
-```{r Function to score data}
+
+## ----Function to score data--------------------------------------------------------------
 # Function to Score data
 function_score_data <-function(clean_data){
 
@@ -76,32 +68,26 @@ scored_data <- clean_data %>%
          sum_cesd = rowSums(select(., starts_with("CES_D"))))%>%
 return(scored_data)
 }
-```
 
 
-```{r Score data}
+## ----Score data--------------------------------------------------------------------------
 # Score the data with no outliers
 scored_data <- function_score_data(clean_data) #score data first, to find outliers among scored data
-```
 
-# Summary of cleaned data 
-```{r}
+
+## ----------------------------------------------------------------------------------------
 # Missing Data & outliers checked
 summary(scored_data)
-```
 
-```{r}
+
+## ----------------------------------------------------------------------------------------
 # Check demographics
 # 1 = male, 2 = female, 3 = non-binary, 4 = don't want to answer
 scored_data$gender <- factor(scored_data$gender, levels=c(1,2,3,4)) # Factor gender
 summary(scored_data$gender)
-```
 
 
-# Descriptives
-- In the first step, the data are summarized to get the descriptive statistics.
-- Subsequently, the data are reformatted.
-```{r}
+## ----------------------------------------------------------------------------------------
 descriptives <- scored_data %>% 
   dplyr::summarize(across(c(SES, Age, mean_cra, mean_hcru,sum_cesd, 
                             mean_pss, mean_bsm),
@@ -123,12 +109,9 @@ descriptives <- scored_data %>%
          PSS = mean_pss,  #
          CESD = sum_cesd, #
          BSM = mean_bsm) #
-```
 
-# Cronbach’s alphas
-- Select the items from the *raw* or *un-scored* data that belong to the specific scale.
-- calculate alpha and extract raw_alpha from the list the alpha function generates.
-```{r}
+
+## ----------------------------------------------------------------------------------------
 # Calculate cronbach’s alphas
 alpha <- scored_data %>%
   dplyr::summarize(
@@ -143,31 +126,27 @@ alpha <- scored_data %>%
     
     # BSM Alphas
     BSM_alpha = select(.,starts_with("BSM")) %>% psych::alpha(check.keys=TRUE) %>%   pluck("total", "raw_alpha"))
-```
 
 
-```{r}
+## ----------------------------------------------------------------------------------------
 # add alphas as extra row to the descriptives table
 descriptives <- descriptives %>%
   add_row(Summary = "alpha", SES = NA, CRA = alpha$cra_alpha, HCRU = alpha$hcru_alpha,
           PSS = alpha$pss_alpha, CESD = alpha$cesd_alpha, BSM = alpha$BSM_alpha)
-```
 
-# Descriptives table
-```{r}
+
+## ----------------------------------------------------------------------------------------
 # Make a nicely formatted table
 apa_table(descriptives) # is only shown when RMarkdown document is knitted
-```
 
-# Plot monthly family income
-```{r}
+
+## ----------------------------------------------------------------------------------------
 income_plot<-hist(scored_data$SES,
                   main="Family income distribution",
                   xlab="family income category")
-```
 
-# Mean centre all IVs
-```{r}
+
+## ----------------------------------------------------------------------------------------
 # Mean centre all IVs for regressions with interaction terms
 centre_data_to_csv <- function(scored_data){
   centred_data <- scored_data %>%
@@ -184,62 +163,53 @@ write.csv(centred_data,"ready_for_analysis.csv", row.names = FALSE)
 
 return(centred_data)
 }
-```
 
 
-# read prepared data for analysis
-```{r}
+## ----------------------------------------------------------------------------------------
 # data <- read_csv("ready_for_analysis.csv") # Read csv data from computer
 # or
 centred_data <- centre_data_to_csv(scored_data)
-```
 
 
-# Original model
-```{r}
+## ----------------------------------------------------------------------------------------
 # Original model 
 org.model <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c, data = centred_data)
 summary(org.model)
-```
 
-```{r}
+
+## ----------------------------------------------------------------------------------------
 # prettier summary with partial correlations
 summ(org.model, confint = TRUE, part.corr = TRUE)
-```
 
-# Check org.model fit
-```{r}
+
+## ----------------------------------------------------------------------------------------
 performance::check_model(org.model)
-```
 
-# Hypotheses B1 & B2: Three-way interaction
-```{r}
+
+## ----------------------------------------------------------------------------------------
 # same model with variable names
 mod.mod.model = lm(sum_cesd ~ PSS_c + CRA_c + SES_c + BSM_c + CRA_c*SES_c  + CRA_c*BSM_c + SES_c*BSM_c + CRA_c*SES_c*BSM_c, data = centred_data)
 summary(mod.mod.model)
-```
 
-```{r}
+
+## ----------------------------------------------------------------------------------------
 # prettier summary with partial correlations
 summ(mod.mod.model, confint = TRUE, part.corr = TRUE)
-```
 
-# Check mod.mod.model fit
-```{r}
+
+## ----------------------------------------------------------------------------------------
 performance::check_model(mod.mod.model)
-```
 
-# Simple slopes analysis
-```{r}
+
+## ----------------------------------------------------------------------------------------
 interactions::sim_slopes(mod.mod.model, pred = CRA_c, modx=SES_c, mod2 = BSM_c, modxvals = NULL, jnalpha = 0.05, digits = 3, n.sd = 1, jnplot = TRUE, confint = TRUE)
-```
 
-# Plot simple slopes for mod.mod interaction
-```{r}
+
+## ----------------------------------------------------------------------------------------
 interactions::interact_plot(mod.mod.model, pred = CRA_c, modx = SES_c, mod2 = BSM_c, centered = "none", y.label = "Cognitive Reappraisal Ability",x.label = "Socioeconomic Status", interval = TRUE, data = centred_data)
-```
 
-```{r}
+
+## ----------------------------------------------------------------------------------------
 # compare models
 anova(org.model,mod.mod.model)
-```
+
