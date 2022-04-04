@@ -4,29 +4,31 @@ author: "Alimohammad Soufizadeh"
 date: "March, 2022"
 ---
 
-Load Packages
+# Load Packages
 ```{r}
 pacman::p_load(pacman, tidyverse, kableExtra, psych, janitor, car, performance, see,gridExtra, interactions, devtools,rmarkdown, knitr, patchwork, readxl,papaja
                ,report)
 ```
 
-save the excel file as a dataframe named "all_data"
+
 ```{r}
-raw_data <- read_excel("Coded_Combined.xlsx")
+# save the excel file as a dataframe named "all_data"
+raw_data <- read_excel("Coded_data.xlsx")
 ```
 
 # Handling Missing Data
-1. drop all NA
 ```{r}
+# 1. drop all NA
 clean_data <- drop_na(raw_data)
 ```
 
-OR 2. Drop NA skipping Age column
-```
-clean_data <- raw_data[complete.cases(raw_data[4:69]),]
+
+```{r}
+# OR 2. Drop NA skipping Age column
+# clean_data <- raw_data[complete.cases(raw_data[4:69]),]
 ```
 
-Check for duplicates
+# Check for duplicates
 ```{r}
 sum(duplicated(clean_data))
 ```
@@ -36,12 +38,12 @@ sum(duplicated(clean_data))
 summary(clean_data)
 ```
 
-Rename columns
 ```{r}
+# Rename columns
 clean_data <- rename(clean_data, "gender" = "Sex")
 ```
 
-Check demographics
+# Check demographics
 ```{r}
 clean_data$gender <- factor(clean_data$gender, levels=c(1,2,3,4))
 summary (clean_data$gender)
@@ -64,9 +66,9 @@ scored_data <- clean_data %>%
 ```
 
 # Descriptives
-In the first step, the data are summarized to get the descriptive statistics.
-Subsequently, the data are reformatted.
+- In the first step, the data are summarized to get the descriptive statistics. Subsequently, the data are reformatted.
 ```{r}
+
 descriptives <- scored_data %>% 
   dplyr::summarize(across(c(SES, Age, mean_cra, mean_hcru,sum_cesd, 
                             mean_pss),
@@ -86,8 +88,8 @@ descriptives <- scored_data %>%
 ```
 
 # Calculate cronbach’s alphas
-Select the items from the raw data that belong to the specific scale.
-calculate alpha and extract raw_alpha from the list the alpha function generates.
+- Select the items from the raw data that belong to the specific scale.
+- Calculate alpha and extract raw_alpha from the list the alpha function generates.
 
 ```{r}
 alpha <- clean_data %>%
@@ -103,25 +105,29 @@ alpha <- clean_data %>%
               pluck("total", "raw_alpha"))
 ```
 
-add alphas as extra row to the descriptives table
+
 ```{r}
+# add alphas as extra row to the descriptives table
+
 descriptives <- descriptives %>%
   add_row(Summary = "alpha", SES = NA, CRA = alpha$cra_alpha,HCRU = alpha$hcru_alpha,PSS = alpha$pss_alpha, CESD = alpha$cesd_alpha)
 ```
 
-make it a nicely formatted table
+
 ```{r}
+# make it a nicely formatted table
+
 apa_table(descriptives)
 ```
 
-Plot monthly family income
+# Plot monthly family income
 ```{r}
 income_plot<-hist(scored_data$SES,
                   main="Family income distribution",
                   xlab="family income category")
 ```
 
-Mean centre all IVs for regressions with interaction terms
+# Mean centre all IVs for regressions with interaction terms
 ```{r}
 centred_data <- scored_data %>%
   mutate(CRA_c = scale(mean_cra, center = TRUE, scale = FALSE),
@@ -129,58 +135,70 @@ centred_data <- scored_data %>%
          PSS_c = scale(mean_pss, center = TRUE, scale = FALSE),
          HCRU_c = scale(mean_hcru, center = TRUE, scale = FALSE))
 ```
+
 # main regression
-CRA and SES individually and the interaction between both
 ```{r}
+#CRA and SES individually and the interaction between both
 fit <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c, data = centred_data)
 ```
-include our covariates individually
-HCRU
+
+# include covariates individually
+
 ```{r}
+# HCRU
 fit_2 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + HCRU_c, data = centred_data)
 ```
 
-Age
+
 ```{r}
+# Age
 fit_3 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + Age, data = centred_data)
 ```
 
-Gender
+
 ```{r}
+# Gender
 fit_4 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + gender, data = centred_data)
 ```
 
-Troy et al. (2017) also modeled one regression with race, however, the current study collected data from Iran without asking question about race. This is discussed in detail in the paper.
 
-Troy et al. (2017) also modeled one regression without controlling for life stress (PSS)
 ```{r}
+# Troy et al. (2017) also modeled one regression with race, however, the current study collected data from Iran without asking question about race. This is discussed in detail in the paper.
+```
+
+
+```{r}
+# Troy et al. (2017) also modeled one regression without controlling for life stress (PSS)
 fit_5 <- lm(sum_cesd ~ CRA_c + SES_c + CRA_c:SES_c, data = centred_data)
 ```
 
-Check model fit
+# Check model fit
 ```{r}
 check_model(fit)
 ```
 
-Model summary
+# Model summary
 ```{r}
 summary(fit)
 ```
 
 # CLEAN UP
 
-Clear environment
 ```{r}
+# Clear environment
 rm(list = ls()) 
 ```
-Clear packages
+
 ```{r}
+# Clear packages
 p_unload(all)
 ```
-Clear console
+
 ```{r}
+# Clear console
 cat("\014")
 ```
 
-
+# References
+- Troy, A. S., Ford, B. Q., McRae, K., Zarolia, P., & Mauss, I. B. (2017). Change the things you can: Emotion regulation is more beneficial for people from lower than from higher socioeconomic status. Emotion, 17(1), 141–154. https://doi.org/10.1037/emo0000210
 
