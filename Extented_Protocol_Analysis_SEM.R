@@ -336,8 +336,11 @@ data <- data %>% mutate(X.W = X * W,
                         M.Z = M * Z,
                         M.W.Z = M * W * Z)
 
+# Original model 
+org.model <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c, data = data)
+
 # Three-way moderation model
-mod.mod.model = lm(Y ~ COV + X + W + Z + X*W  + X*Z + W*Z + X*W*Z, data = data)
+mod.mod.model = lm(sum_cesd ~ PSS_c + CRA_c + SES_c + BSM_c + CRA_c*SES_c  + CRA_c*BSM_c + SES_c*BSM_c + CRA_c*SES_c*BSM_c, data = data)
 summary(mod.mod.model)
 
 # Check model fit
@@ -348,6 +351,9 @@ interactions::sim_slopes(mod.mod.model, pred = X, modx=W, mod2 = Z, modxvals = N
 
 # Plot simple slopes for interaction
 interactions::interact_plot(mod.mod.model, pred = X, modx = W, mod2 = Z, centered = "none", y.label = "Cognitive Reappraisal Ability",x.label = "Socioeconomic Status", interval = TRUE, data = data)
+
+# compare models
+anova(org.model,mod.mod.model)
 
 # Hypotheses C1 & C2: Moderated Mediation
 # The Model
