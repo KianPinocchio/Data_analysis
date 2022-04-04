@@ -6,11 +6,11 @@ Date: "March, 2022"
 
 ```{r}
 # Load packages
-pacman::p_load(pacman, tidyverse, kableExtra, psych, lavaan,
-               gridExtra,knitr, readxl, papaja, report, mice, VIM)
+pacman::p_load(pacman, tidyverse, kableExtra, psych, interactions,
+               gridExtra,knitr, readxl, papaja, rmarkdown)
 ```
 
-# read all data
+# Read raw data
 ```{r}
 raw_data <- read_excel("Coded_data_2.xlsx")
 ```
@@ -44,6 +44,11 @@ no_zero_var <- no_missing[apply(no_missing[, -c(1:4)], 1, var) != 0, ]
 ```{r}
 # 3. exclude participants who took less than 3 minutes (180 seconds) to complete the survey
 clean_data <- no_zero_var %>% filter(duration >= 180)
+```
+
+```{r}
+# Check for duplicates
+sum(duplicated(scored_data))
 ```
 
 # Data summary
@@ -84,13 +89,6 @@ scored_data <- function_score_data(clean_data) #score data first, to find outlie
 # Missing Data & outliers checked
 summary(scored_data)
 ```
-
-
-```{r}
-# Check for duplicates
-sum(duplicated(scored_data))
-```
-
 
 ```{r}
 # Check demographics
@@ -158,7 +156,6 @@ descriptives <- descriptives %>%
 # Descriptives table
 ```{r}
 # Make a nicely formatted table
-library(rmarkdown)
 apa_table(descriptives) # is only shown when RMarkdown document is knitted
 ```
 
@@ -197,31 +194,16 @@ return(centred_data)
 ready_for_analysis <- centre_data_to_csv(scored_data)
 ```
 
-# Hypotheses B1 & B2: Three-way interaction
 
-```{r}
-# Rename variables for convenience in modelling
-data <- ready_for_analysis %>% mutate(rename(ready_for_analysis,
-                                "X" = "CRA_c",
-                                "Y" = "sum_cesd",
-                                "W" = "SES_c",
-                                "Z" = "BSM_c",
-                                "COV" = "PSS_c"))
-```
-
-Create interaction terms
-```{r}
-# Create interaction terms
-data <- data %>% mutate(X.W = X * W,
-                        X.Z = X * Z,
-                        W.Z = W * Z,
-                        X.W.Z = X * W * Z)
-```
-
+# Original model
 ```{r}
 # Original model 
 org.model <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c, data = data)
 summary(org.model)
+```
+```{r}
+# prettier summary with partial correlations
+summ(org.model, confint = TRUE, part.corr = TRUE)
 ```
 
 # Check org.model fit
@@ -229,14 +211,16 @@ summary(org.model)
 performance::check_model(org.model)
 ```
 
-# Three-way moderation model
+# Hypotheses B1 & B2: Three-way interaction
 ```{r}
-# For simplicity of the math
-mod.mod.model = lm(Y ~ COV + X + W + Z + X*W  + X*Z + W*Z + X*W*Z, data = data)
-
 # same model with variable names
 mod.mod.model = lm(sum_cesd ~ PSS_c + CRA_c + SES_c + BSM_c + CRA_c*SES_c  + CRA_c*BSM_c + SES_c*BSM_c + CRA_c*SES_c*BSM_c, data = data)
 summary(mod.mod.model)
+```
+
+```{r}
+# prettier summary with partial correlations
+summ(mod.mod.model, confint = TRUE, part.corr = TRUE)
 ```
 
 # Check mod.mod.model fit
@@ -246,10 +230,10 @@ performance::check_model(mod.mod.model)
 
 # Simple slopes analysis
 ```{r}
-interactions::sim_slopes(mod.mod.model, pred = CRA_c, modx=SES_c, mod2 = BSM_c, modxvals = NULL, jnalpha = 0.05, digits = 3, n.sd = 1)
+interactions::sim_slopes(mod.mod.model, pred = CRA_c, modx=SES_c, mod2 = BSM_c, modxvals = NULL, jnalpha = 0.05, digits = 3, n.sd = 1, jnplot = TRUE, confint = TRUE)
 ```
 
-# Plot simple slopes for interaction
+# Plot simple slopes for mod.mod interaction
 ```{r}
 interactions::interact_plot(mod.mod.model, pred = CRA_c, modx = SES_c, mod2 = BSM_c, centered = "none", y.label = "Cognitive Reappraisal Ability",x.label = "Socioeconomic Status", interval = TRUE, data = data)
 ```
@@ -257,20 +241,4 @@ interactions::interact_plot(mod.mod.model, pred = CRA_c, modx = SES_c, mod2 = BS
 ```{r}
 # compare models
 anova(org.model,mod.mod.model)
-```
-
-# CLEAN UP
-```{r}
-# Clear environment
-rm(list = ls()) 
-```
-
-```{r}
-# Clear packages 
-p_unload(all)
-```
-
-```{r}
-# Clear console
-cat("\014")
 ```
