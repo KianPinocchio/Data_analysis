@@ -1,95 +1,120 @@
----
-title: "Replication of the data analysis in Study1 by Troy et al. (2017) with an Iranian sample."
-author: "Alimohammad Soufizadeh"
-date: "March, 2022"
----
 
-pacman::p_load(pacman, tidyverse, kableExtra, psych, 
-               janitor, car, performance, see,
-               gridExtra, interactions, devtools,
-               rmarkdown, knitr, patchwork, readxl, papaja, report)
+# title: "Replication of the data analysis in Study1 by Troy et al. (2017) with an Iranian sample."
+# author: "Alimohammad Soufizadeh"
+# date: "March, 2022"
 
-# read all data
-raw_data <- read_excel("Coded_data.xlsx") #save the excel file as a dataframe named "all_data"
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+pacman::p_load(pacman, tidyverse, kableExtra, psych, janitor, car, performance, 
+               see,gridExtra, interactions, devtools,rmarkdown, 
+               knitr, patchwork, readxl,papaja, jtools)
 
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+# save the excel file as a dataframe named "all_data"
+raw_data <- read_excel("Coded_data.xlsx")
+
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 # Change column names
 raw_data <- rename(raw_data, 
                    "duration" = "Duration(Second)",
                    "gender" = "Sex")
 
-# Raw data
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 # summarise raw data
 summary(raw_data)
 
-# Exclusion crtieria
-# Based on Troy et al's (2017) criteria
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 # 1. exclude all who didn't complete the survey or had missing data
 no_missing <- drop_na(raw_data)
 
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 # 2. exclude participants with zero variance among their answers
 no_zero_var <- no_missing[apply(no_missing[, -c(1:4)], 1, var) != 0, ]
 
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 # 3. exclude participants who took less than 3 minutes (180 seconds) to complete the survey
 clean_data <- no_zero_var %>% filter(duration >= 180)
 
-# Data summary
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+# Check for duplicates
+sum(duplicated(clean_data))
+
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 summary(clean_data)
 
-# Check demographics
-clean_data$gender <- factor(clean_data$gender, levels=c(1,2,3,4))
-summary (clean_data$gender)
 
-#Score questionnaires:
-#save variables in separate data frame
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+# Gender
+clean_data$gender <- factor(clean_data$gender, levels=c(1,2,3,4))
+summary(clean_data$gender)
+
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+# Education
+clean_data$Edu <- factor(clean_data$Edu, levels=c(1,2,3,4,5))
+summary(clean_data$Edu)
+
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 scored_data <- clean_data %>%
-  
-  #row mean of the selected columns
-  mutate(across(c("PSS2", "PSS3"), ~{6 - .}), # recode PSS items 2 & 3 (6 - response)
-         across(c("BSM1", "BSM3", "BSM7", "BSM8"), ~{8 - .}), # first recode BSM items 1, 3, 7, 8 (8 - response)
+  mutate(across(c("PSS2", "PSS3"), ~{6 - .}),
+         across(c("BSM1", "BSM3", "BSM7", "BSM8"), ~{8 - .}),
          mean_cra = rowMeans(select(., starts_with("CRA"))),
          mean_hcru = rowMeans(select(., starts_with("HCRU"))),
          mean_pss = rowMeans(select(., starts_with("PSS"))),
-         
-          #for cesd, we need the sum
+         mean_bsm = rowMeans(select(., starts_with("BSM"))),
          sum_cesd = rowSums(select(., starts_with("CES_D"))))%>%
-
-  # select the scores/final variables used, remove the raw items
-  select(id, Age, SES, gender, mean_cra, mean_hcru,
+         
+  select(Age, SES, Edu, gender, mean_cra, mean_hcru,
          sum_cesd, mean_pss)
 
-# Descriptives
 
-# In the first step, the data are summarized to get the descriptive statistics.
-#Subsequently, the data are reformatted.
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+gender_freq <- scored_data %>% tabyl(gender)
+levels(gender_freq$gender) <- c("male","female", "non-binary", "DWA")
+
+edu_freq <- scored_data %>% tabyl(Edu)
+levels(edu_freq$Edu) <- c("Elementary or lower","Highschool Diploma", "Bachelor's", "Master's", "PhD or higher")
+
+frequencies<-edu_freq %>% #combine tables
+add_row(Edu=gender_freq$gender, n = gender_freq$n, percent = gender_freq$percent) %>%
+rename(Category = Edu)
+
+apa_table(frequencies, caption = "Proportions of Education level and gender categories")
+
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 descriptives <- scored_data %>% 
   dplyr::summarize(across(c(SES, Age, mean_cra, mean_hcru,sum_cesd, 
                             mean_pss),
-                   list(mean = mean, sd = sd, min = min, max = max))) %>%
-  
-  # bring everything in long format
+                   list(mean = mean, sd = sd, min = min, max = max)))%>%
+
   pivot_longer(everything(), names_to = "name") %>%
   
-  # separate names at last underscore
-  separate(name, into = c("name","descriptive"), sep = "_(?=[^_]+$)") %>%
+  separate(name, into = c("name","descriptive"), sep = "_(?=[^_]+$)")%>%
   
-  # get into a bit wider format again
   pivot_wider(names_from = name, values_from = value) %>%
   
-  # rename to have nicer column names
   rename(Summary = descriptive,
-         CRA = mean_cra,  #
-         HCRU = mean_hcru, #
-         PSS = mean_pss,  #
-         CESD = sum_cesd) # 
+         CRA = mean_cra,  
+         HCRU = mean_hcru,
+         PSS = mean_pss,  
+         CESD = sum_cesd)
 
-# Calculate cronbach’s alphas
-# Select the items from the raw data that belong to the specific scale.
-# calculate alpha and extract raw_alpha from the list the alpha function generates.
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 alpha <- clean_data %>%
   dplyr::summarize(
             # Replication Block Alphas
             cra_alpha = select(.,starts_with("CRA")) %>% psych::alpha() %>%
-              pluck("total", "raw_alpha"), # extract total and then raw_alpha from list
+              pluck("total", "raw_alpha"),
             hcru_alpha = select(.,starts_with("HCRU")) %>% psych::alpha() %>%
               pluck("total", "raw_alpha"),
             cesd_alpha = select(.,starts_with("CES_D")) %>% psych::alpha() %>%
@@ -97,70 +122,117 @@ alpha <- clean_data %>%
             pss_alpha = select(.,starts_with("PSS")) %>% psych::alpha(check.keys=TRUE) %>%
               pluck("total", "raw_alpha"))
 
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 # add alphas as extra row to the descriptives table
 descriptives <- descriptives %>%
-  add_row(Summary = "alpha", SES = NA, CRA = alpha$cra_alpha, HCRU = alpha$hcru_alpha,
-          PSS = alpha$pss_alpha, CESD = alpha$cesd_alpha)
+  add_row(Summary = "alpha", SES = NA, CRA = alpha$cra_alpha,HCRU = alpha$hcru_alpha,PSS = alpha$pss_alpha, CESD = alpha$cesd_alpha)
 
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 # make it a nicely formatted table
-library(rmarkdown)
-apa_table(descriptives) # is only shown when RMarkdown document is knitted
+apa_table(descriptives)
 
-# Plot monthly family income
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 income_plot<-hist(scored_data$SES,
                   main="Family income distribution",
                   xlab="family income category")
 
 
-# Mean centre all IVs for regressions with interaction terms
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 centred_data <- scored_data %>%
   mutate(CRA_c = scale(mean_cra, center = TRUE, scale = FALSE),
          SES_c = scale(SES, center = TRUE, scale = FALSE),
          PSS_c = scale(mean_pss, center = TRUE, scale = FALSE),
          HCRU_c = scale(mean_hcru, center = TRUE, scale = FALSE))
 
-# main regression
-# CRA and SES individually and the interaction between both
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+#CRA and SES individually and the interaction between both
 fit <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c, data = centred_data)
-# include our covariates individually:
-#HCRU
-fit_2 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + HCRU_c, data = centred_data)
-#age
-fit_3 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + Age, data = centred_data)
-#gender
-fit_4 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + gender, data = centred_data)
 
-# Troy et al. (2017) also modeled one regression with race, however, 
-# the current study collected data from Iran without asking question about race. 
-# This is discussed in detail in the paper.
 
-#They also modelled one regression without controlling for life stress (PSS):
-fit_5 <- lm(sum_cesd ~ CRA_c + SES_c + CRA_c:SES_c, data = centred_data)
-
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 check_model(fit)
 
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 summary(fit)
 
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+# Fit 
+# prettier summary with partial correlations
+summ(fit, confint = TRUE, part.corr = TRUE)
+
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+interactions::sim_slopes(fit, pred = CRA_c, modx=SES_c,modxvals = NULL, jnalpha = 0.05, digits = 3, n.sd = 1, jnplot = TRUE, confint = TRUE)
+
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+# create interaction plot
 interaction_plot <- interactions::interact_plot(model = fit,
                                                 pred = CRA_c,
                                                 modx = SES_c,
-                                                interval=TRUE,
+                                                interval=TRUE, 
                                                 x.label = "Cognitive Reappraisal Ability",
                                                 y.label= "Depressive Symptoms",
                                                 legend.main = "family income")
 
-# CLEAN UP #
+interaction_plot
 
-# Clear environment
-rm(list = ls()) 
 
-# Clear packages
-p_unload(all)
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+# HCRU
+fit_2 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + HCRU_c, data = centred_data)
+summ(fit_2, confint = TRUE, part.corr = TRUE)
 
-# Clear console
-cat("\014")
 
-# References
-# Troy, A. S., Ford, B. Q., McRae, K., Zarolia, P., & Mauss, I. B. (2017). 
-# Change the things you can: Emotion regulation is more beneficial for people from lower than from higher socioeconomic status. Emotion, 17(1), 141–154. 
-# https://doi.org/10.1037/emo0000210
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+# Age
+fit_3 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + Age, data = centred_data)
+summ(fit_3, confint = TRUE, part.corr = TRUE)
+
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+interactions::sim_slopes(fit_3, pred = CRA_c, modx=SES_c,modxvals = NULL, 
+                         jnalpha = 0.05, digits = 3, n.sd = 1, jnplot = TRUE, confint = TRUE)
+
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+# create interaction plot
+interaction_plot_3 <- interactions::interact_plot(model = fit_3,
+                                                pred = CRA_c,
+                                                modx = SES_c,
+                                                interval=TRUE, 
+                                                x.label = "Cognitive Reappraisal Ability",
+                                                y.label= "Depressive Symptoms",
+                                                legend.main = "family income")
+
+interaction_plot_3
+
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+# Gender
+fit_4 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + gender, data = centred_data)
+summ(fit_4, confint = TRUE, part.corr = TRUE)
+
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+# Education
+fit_5 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + Edu, data = centred_data)
+summ(fit_5, confint = TRUE, part.corr = TRUE)
+
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+# Troy et al. (2017) also modeled one regression with race, however, the current study collected data from Iran without asking question about race. This is discussed in detail in the paper.
+
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+# Troy et al. (2017) also modeled one regression without controlling for life stress (PSS)
+fit_6 <- lm(sum_cesd ~ CRA_c + SES_c + CRA_c:SES_c, data = centred_data)
+
+summ(fit_6, confint = TRUE, part.corr = TRUE)
+

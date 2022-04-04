@@ -6,8 +6,9 @@ date: "March, 2022"
 
 # Load Packages
 ```{r}
-pacman::p_load(pacman, tidyverse, kableExtra, psych, janitor, car, performance, see,gridExtra, interactions, devtools,rmarkdown, knitr, patchwork, readxl,papaja
-               ,report)
+pacman::p_load(pacman, tidyverse, kableExtra, psych, janitor, car, performance, 
+               see,gridExtra, interactions, devtools,rmarkdown, 
+               knitr, patchwork, readxl,papaja, jtools)
 ```
 
 
@@ -46,6 +47,11 @@ no_zero_var <- no_missing[apply(no_missing[, -c(1:4)], 1, var) != 0, ]
 clean_data <- no_zero_var %>% filter(duration >= 180)
 ```
 
+```{r}
+# Check for duplicates
+sum(duplicated(clean_data))
+```
+
 # Data summary
 ```{r}
 summary(clean_data)
@@ -53,11 +59,18 @@ summary(clean_data)
 
 # Check demographics
 ```{r}
+# Gender
 clean_data$gender <- factor(clean_data$gender, levels=c(1,2,3,4))
 summary(clean_data$gender)
 ```
 
-#save variables in separate data frame
+```{r}
+# Education
+clean_data$Edu <- factor(clean_data$Edu, levels=c(1,2,3,4,5))
+summary(clean_data$Edu)
+```
+
+# Score data
 ```{r}
 scored_data <- clean_data %>%
   mutate(across(c("PSS2", "PSS3"), ~{6 - .}),
@@ -68,14 +81,30 @@ scored_data <- clean_data %>%
          mean_bsm = rowMeans(select(., starts_with("BSM"))),
          sum_cesd = rowSums(select(., starts_with("CES_D"))))%>%
          
-  select(id, Age, SES, gender, mean_cra, mean_hcru,
+  select(Age, SES, Edu, gender, mean_cra, mean_hcru,
          sum_cesd, mean_pss)
 ```
 
+# Frequency table
+```{r}
+gender_freq <- scored_data %>% tabyl(gender)
+levels(gender_freq$gender) <- c("male","female", "non-binary", "DWA")
+
+edu_freq <- scored_data %>% tabyl(Edu)
+levels(edu_freq$Edu) <- c("Elementary or lower","Highschool Diploma", "Bachelor's", "Master's", "PhD or higher")
+
+frequencies<-edu_freq %>% #combine tables
+add_row(Edu=gender_freq$gender, n = gender_freq$n, percent = gender_freq$percent) %>%
+rename(Category = Edu)
+
+apa_table(frequencies, caption = "Proportions of Education level and gender categories")
+```
+
+
 # Descriptives
 - In the first step, the data are summarized to get the descriptive statistics. Subsequently, the data are reformatted.
-```{r}
 
+```{r}
 descriptives <- scored_data %>% 
   dplyr::summarize(across(c(SES, Age, mean_cra, mean_hcru,sum_cesd, 
                             mean_pss),
@@ -115,7 +144,6 @@ alpha <- clean_data %>%
 
 ```{r}
 # add alphas as extra row to the descriptives table
-
 descriptives <- descriptives %>%
   add_row(Summary = "alpha", SES = NA, CRA = alpha$cra_alpha,HCRU = alpha$hcru_alpha,PSS = alpha$pss_alpha, CESD = alpha$cesd_alpha)
 ```
@@ -123,7 +151,6 @@ descriptives <- descriptives %>%
 
 ```{r}
 # make it a nicely formatted table
-
 apa_table(descriptives)
 ```
 
@@ -143,40 +170,12 @@ centred_data <- scored_data %>%
          HCRU_c = scale(mean_hcru, center = TRUE, scale = FALSE))
 ```
 
-# main regression
+# Regressions
+
+# Main model
 ```{r}
 #CRA and SES individually and the interaction between both
 fit <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c, data = centred_data)
-```
-
-# include covariates individually
-
-```{r}
-# HCRU
-fit_2 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + HCRU_c, data = centred_data)
-```
-
-
-```{r}
-# Age
-fit_3 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + Age, data = centred_data)
-```
-
-
-```{r}
-# Gender
-fit_4 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + gender, data = centred_data)
-```
-
-
-```{r}
-# Troy et al. (2017) also modeled one regression with race, however, the current study collected data from Iran without asking question about race. This is discussed in detail in the paper.
-```
-
-
-```{r}
-# Troy et al. (2017) also modeled one regression without controlling for life stress (PSS)
-fit_5 <- lm(sum_cesd ~ CRA_c + SES_c + CRA_c:SES_c, data = centred_data)
 ```
 
 # Check model fit
@@ -189,21 +188,91 @@ check_model(fit)
 summary(fit)
 ```
 
-# CLEAN UP
+# Prettier summary with partial correlations
+```{r}
+# Fit 
+# prettier summary with partial correlations
+summ(fit, confint = TRUE, part.corr = TRUE)
+```
+
+# Simple slope analysis
+```{r}
+interactions::sim_slopes(fit, pred = CRA_c, modx=SES_c,modxvals = NULL, jnalpha = 0.05, digits = 3, n.sd = 1, jnplot = TRUE, confint = TRUE)
+```
+
+# Interaction plot
+```{r}
+# create interaction plot
+interaction_plot <- interactions::interact_plot(model = fit,
+                                                pred = CRA_c,
+                                                modx = SES_c,
+                                                interval=TRUE, 
+                                                x.label = "Cognitive Reappraisal Ability",
+                                                y.label= "Depressive Symptoms",
+                                                legend.main = "family income")
+
+interaction_plot
+```
+
+# Include covariates individually
 
 ```{r}
-# Clear environment
-rm(list = ls()) 
+# HCRU
+fit_2 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + HCRU_c, data = centred_data)
+summ(fit_2, confint = TRUE, part.corr = TRUE)
+```
+
+
+```{r}
+# Age
+fit_3 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + Age, data = centred_data)
+summ(fit_3, confint = TRUE, part.corr = TRUE)
+```
+
+# Simple slopes for fit_3: Age
+```{r}
+interactions::sim_slopes(fit_3, pred = CRA_c, modx=SES_c,modxvals = NULL, 
+                         jnalpha = 0.05, digits = 3, n.sd = 1, jnplot = TRUE, confint = TRUE)
+```
+
+
+# Interaction plot for fit_3: Age
+```{r}
+# create interaction plot
+interaction_plot_3 <- interactions::interact_plot(model = fit_3,
+                                                pred = CRA_c,
+                                                modx = SES_c,
+                                                interval=TRUE, 
+                                                x.label = "Cognitive Reappraisal Ability",
+                                                y.label= "Depressive Symptoms",
+                                                legend.main = "family income")
+
+interaction_plot_3
+```
+
+
+```{r}
+# Gender
+fit_4 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + gender, data = centred_data)
+summ(fit_4, confint = TRUE, part.corr = TRUE)
 ```
 
 ```{r}
-# Clear packages
-p_unload(all)
+# Education
+fit_5 <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c + Edu, data = centred_data)
+summ(fit_5, confint = TRUE, part.corr = TRUE)
 ```
 
 ```{r}
-# Clear console
-cat("\014")
+# Troy et al. (2017) also modeled one regression with race, however, the current study collected data from Iran without asking question about race. This is discussed in detail in the paper.
+```
+
+
+```{r}
+# Troy et al. (2017) also modeled one regression without controlling for life stress (PSS)
+fit_6 <- lm(sum_cesd ~ CRA_c + SES_c + CRA_c:SES_c, data = centred_data)
+
+summ(fit_6, confint = TRUE, part.corr = TRUE)
 ```
 
 # References
