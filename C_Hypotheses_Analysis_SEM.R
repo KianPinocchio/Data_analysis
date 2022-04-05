@@ -5,8 +5,8 @@ Date: "March, 2022"
 ---
 
 # Load packages
-pacman::p_load(pacman, tidyverse, kableExtra, psych, lavaan,
-               gridExtra,knitr, readxl, papaja, report, mice, VIM, rmarkdown)
+pacman::p_load(pacman, tidyverse, kableExtra, psych, lavaan, corrplot, performance,
+               semPlot, gridExtra,knitr, readxl, papaja, report, mice, VIM, rmarkdown)
 
 
 # read all data
@@ -17,71 +17,79 @@ raw_data <- rename(raw_data,
                    "duration" = "Duration(Second)", # in seconds
                    "gender" = "Sex")
 
-# Handling Missing Data
+# Handle missing data according to replication protocol
+Rep_exclusion_criteria <-function(raw_data){
+  # 1. exclude all who didn't complete the survey or had missing data
+  no_missing <- drop_na(raw_data)
+  
+  # 2. exclude participants with zero variance among their answers
+  no_zero_var <- no_missing[apply(no_missing[, -c(1:4)], 1, var) != 0, ]
+  
+  # 3. exclude participants who took less than 3 minutes (180 seconds) to complete the survey
+  clean_data <- no_zero_var %>% filter(duration >= 180)
+  
+  # Check for duplicates
+  sum(duplicated(clean_data))
+  
+  return(clean_data)
+}
 
-# 1
-# 1. drop all NA
-# Run only if you want to run analysis with dropping all NA
-clean_data <- drop_na(raw_data) 
 
-# 2
-# 2. ALT way of handling Missing Data: Drop ALL NA skipping the Age column
-clean_data <- raw_data[complete.cases(raw_data[4:69]),]
-
-# 3. Impute missing data
 # Missing data pattern
 missing.pattern<-md.pattern(raw_data)
-
+  
 # visualise missing data
-library(VIM)
 mice_plot <- aggr(raw_data,numbers=TRUE, sortVars=TRUE,
                     labels=names(raw_data), cex.axis=.7,
                     gap=3, ylab=c("Missing data","Pattern"))
-
+  
 # Percentage of missing data per row
-no_missing <- raw_data
+temp_no_missing <- raw_data
 percent_missing <- function(x){sum(is.na(x)/length(x)*100)}
-
-missing <- apply(no_missing,1,percent_missing)
+missing <- apply(temp_no_missing,1,percent_missing)
 table(missing)
-
+  
 # Look for data to be imputed based on rows
-replace_rows <- subset(no_missing, missing <= 5)
-no_rows <- subset(no_missing, missing > 5)
-
+replace_rows <- subset(temp_no_missing, missing <= 5)
+no_rows <- subset(temp_no_missing, missing > 5)
+  
 # Then look for data to be imputed based on columns
 missing <- apply(replace_rows, 2, percent_missing)
 table(missing)
-
 replace_columns <- replace_rows %>% select_if(missing<=5)
 no_columns <- replace_rows %>% select_if(missing > 5)
+  
+function_data_imputation <- function(replace_columns, no_columns){  
+  #IMPUTE DATA
+  #Mice easily imputes, taking into account data type.
+  tempnomiss <- mice(replace_columns, print=FALSE)
+  
+  # Get all the imputed data
+  imputed_columns <- complete(tempnomiss)
+  
+  # Putting the data we dropped before back together with the rest
+  clean_data <- cbind(no_columns, imputed_columns)
+  #all_rows <- rbind(clean_data, no_rows) Only use if you want all other rows with NA binded as well
+  return(clean_data)
+}
 
+# Run the data imputation function or the replication criteria for exclusion
+clean_data <- function_data_imputation(replace_columns, no_columns)
 
-#IMPUTE DATA
-#Mice easily imputes, taking into account data type.
-tempnomiss <- mice(replace_columns)
-
+# cleaned data based on replicated exclusion criteria
+clean_data_2 <- Rep_exclusion_criteria(raw_data)
 
 # Visualise missing data AGAIN!!!
-library(VIM)
-mice_plot <- aggr(replace_columns,numbers=TRUE, sortVars=TRUE,
-                  labels=names(replace_columns), cex.axis=1,
-                  gap=1, ylab=c("Missing data","Pattern"))
-
-# Get all the imputed data
-imputed_columns <- complete(tempnomiss)
-
-# Putting the data we dropped before back together with the rest
-all_columns <- cbind(no_columns, imputed_columns)
-'all_rows <- rbind(all_columns, no_rows)' # Only use if you want all other rows with NA binded as well
+mice_plot <- aggr(clean_data,numbers=TRUE, sortVars=TRUE,
+                  labels=names(clean_data), cex.axis=1,
+                  gap=1, ylab=c("Post imputation missing data","Pattern"))
 
 # Outliers
 # Prepare for outlier detection
 columns = c("id", "Platform", "consent","duration", "Age","gender", "Edu")
-demographics <- subset(all_columns, select = columns) 
-all_columns <- all_columns[ , ! names(all_columns) %in% columns]
-imputed_data <- cbind(demographics, all_columns) # Save all clean data
-
+demographics <- subset(clean_data, select = columns) 
+clean_data <- clean_data[ , ! names(clean_data) %in% columns]
+temp_no_outlier <- cbind(demographics, clean_data) # Save all clean data
 
 
 # Outliers Mahalanobis
@@ -89,17 +97,19 @@ imputed_data <- cbind(demographics, all_columns) # Save all clean data
 # Detect outliers based on **unscored** data
 
 # Mahalanobis for unscored data
-mahal <- mahalanobis(imputed_data[ , -c(1:7)],
-  colMeans(imputed_data[ , -c(1:7)], na.rm=TRUE),
-  cov(imputed_data[ , -c(1:7)], use ="pairwise.complete.obs"))
+mahal <- mahalanobis(temp_no_outlier[ , -c(1:7)],
+  colMeans(temp_no_outlier[ , -c(1:7)], na.rm=TRUE),
+  cov(temp_no_outlier[ , -c(1:7)], use ="pairwise.complete.obs"))
 
 cutoff <- qchisq(p = 1 - .001, #1 minus alpha
-                 df = ncol(imputed_data[ , -c(1:7)])) # number of columns
+                 df = ncol(temp_no_outlier[ , -c(1:7)])) # number of columns
 
 # Drop all outliers detected based on *unscored* data
 cutoff
 summary(mahal < cutoff) #notice the direction 
-no_outlier <- subset(imputed_data, mahal < cutoff)
+no_outlier <- subset(temp_no_outlier, mahal < cutoff)
+
+# summarise no outlier data
 summary(no_outlier)
 
 
@@ -167,14 +177,13 @@ summary(scored_data)
 
 
 # Additivity
-library(corrplot)
 plot_data <- cbind(scored_data$SES,scored_data[ , -c(1:69)])
 corrplot(cor(plot_data))
 
 
 # Assumptions Set Up
 random_variable <- rchisq(nrow(scored_data), 7)
-fake_model <- lm(scored_data$sum_cesd ~ ., # What's the difference if I regress on scored_data$sum_cesd ??
+fake_model <- lm(random_variable ~ ., # What's the difference if I regress on scored_data$sum_cesd ??
                  data = scored_data[ , -c(1:69)])
 standardized <- rstudent(fake_model) # residuals
 fitvalues <- scale(fake_model$fitted.values) # z-score them
@@ -336,24 +345,6 @@ data <- data %>% mutate(X.W = X * W,
                         M.Z = M * Z,
                         M.W.Z = M * W * Z)
 
-# Original model 
-org.model <- lm(sum_cesd ~ PSS_c + CRA_c + SES_c + CRA_c:SES_c, data = data)
-
-# Three-way moderation model
-mod.mod.model = lm(sum_cesd ~ PSS_c + CRA_c + SES_c + BSM_c + CRA_c*SES_c  + CRA_c*BSM_c + SES_c*BSM_c + CRA_c*SES_c*BSM_c, data = data)
-summary(mod.mod.model)
-
-# Check model fit
-performance::check_model(mod.mod.model)
-
-# Simple slopes analysis
-interactions::sim_slopes(mod.mod.model, pred = X, modx=W, mod2 = Z, modxvals = NULL, jnalpha = 0.05, digits = 3, n.sd = 1)
-
-# Plot simple slopes for interaction
-interactions::interact_plot(mod.mod.model, pred = X, modx = W, mod2 = Z, centered = "none", y.label = "Cognitive Reappraisal Ability",x.label = "Socioeconomic Status", interval = TRUE, data = data)
-
-# compare models
-anova(org.model,mod.mod.model)
 
 # Hypotheses C1 & C2: Moderated Mediation
 # The Model
@@ -411,7 +402,8 @@ prop.mediated.above := indirect.above / total.above
 Mod.Med.SEM <- sem(model = MOD.MED.model,
                    data = data,
                    se = "bootstrap",
-                   bootstrap = 200) # do 5000 when actually running the code
+                   estimator = "MLM",
+                   bootstrap = 5000) # do 5000 when actually running the code
 
 # Model summary
 summary(Mod.Med.SEM, fit.measures = FALSE, standardize = TRUE, rsquare = TRUE)
@@ -422,17 +414,6 @@ parameterEstimates(Mod.Med.SEM, remove.nonfree = TRUE)
 
 # Plot the moderated mediation model
 # Plot model
-library(semPlot)
 plot = semPaths(Mod.Med.SEM, fixedStyle = 1, layout = "tree", 
                   intercepts = F, label.scale=T, nCharNodes = 0, 
                   sizeMan2=3, sizeMan=7, asize=2, residuals = F, exoCov = T)
-
-# CLEAN UP
-# Clear environment
-rm(list = ls()) 
-
-# Clear packages 
-p_unload(all)
-
-# Clear console
-cat("\014")
