@@ -4,10 +4,10 @@ author: "Alimohammad Soufizadeh"
 date: "March, 2022"
 ---
 
-```{r}
+```{r include=FALSE}
 # Load packages
-pacman::p_load(pacman, tidyverse, kableExtra, psych, lavaan, corrplot, performance,
-               semPlot, gridExtra,knitr, readxl, papaja, report, mice, VIM, rmarkdown)
+pacman::p_load(pacman, tidyverse, kableExtra, psych, lavaan, corrplot, performance, MVN, ICS,
+               semPlot, gridExtra,knitr, readxl, papaja, report, mice, VIM, rmarkdown, janitor)
 ```
 
 # read all data
@@ -53,7 +53,6 @@ missing.pattern<-md.pattern(raw_data)
 
 ```{r}
 # visualise missing data
-library(VIM)
 mice_plot <- aggr(raw_data,numbers=TRUE, sortVars=TRUE,
                     labels=names(raw_data), cex.axis=.7,
                     gap=3, ylab=c("Missing data","Pattern"))
@@ -106,7 +105,7 @@ function_data_imputation <- function(replace_columns, no_columns){
 
 ```{r}
 # Run the data imputation function or the replication criteria for exclusion
-clean_data <- function_data_imputation(replace_columns, no_columns)
+imputed_data <- function_data_imputation(replace_columns, no_columns)
 ```
 
 ```{r}
@@ -117,7 +116,7 @@ clean_data_2 <- Rep_exclusion_criteria(raw_data)
 
 # Visualise missing data AGAIN!!!
 ```{r}
-mice_plot <- aggr(clean_data,numbers=TRUE, sortVars=TRUE,
+mice_plot <- aggr(imputed_data,numbers=TRUE, sortVars=TRUE,
                   labels=names(replace_columns), cex.axis=1,
                   gap=1, ylab=c("Missing data","Pattern"))
 ```
@@ -127,9 +126,9 @@ mice_plot <- aggr(clean_data,numbers=TRUE, sortVars=TRUE,
 ```{r}
 # Prepare for outlier detection
 columns = c("id", "Platform", "consent","duration", "Age","gender", "Edu")
-demographics <- subset(clean_data, select = columns) 
-clean_data <- clean_data[ , ! names(clean_data) %in% columns]
-imputed_data <- cbind(demographics, clean_data) # Save all clean data
+demographics <- subset(imputed_data, select = columns) 
+imputed_data <- imputed_data[ , ! names(imputed_data) %in% columns]
+imputed_data <- cbind(demographics, imputed_data) # Save all clean data
 ```
 
 
@@ -157,9 +156,13 @@ no_outlier <- subset(imputed_data, mahal < cutoff)
 summary(no_outlier)
 ```
 
+```{r}
+# Check for duplicates
+sum(duplicated(no_outlier))
+```
 
 # Score data
-- Prepare to score the data with temporarily no outliers
+- Prepare to score the data with no outliers
 
 ```{r}
 # Create MCQ subscale variable groups
@@ -222,70 +225,41 @@ scored_data <- function_score_data(no_outlier) #score data first, to find outlie
 summary(scored_data)
 ```
 
-# Assumptions
-
-- Additivity is the assumption that each variable adds something to the model
-- You basically do not want to use the same variable twice, as that lowers power
-- Often this is described as multicollinearity (The problem is multicollineartiy). The assumption is called additivity.
-- Mainly, SEM analysis has a lot of correlated variables, you just want to make sure they aren't perfectly correlated
-
-
-# Additivity
+# Assumptions: Additivity
 ```{r}
 plot_data <- cbind(scored_data$SES,scored_data[ , -c(1:69)])
 corrplot(cor(plot_data))
 ```
 
-
-# Assumptions Set Up
+# Assumption: Multivariate Normality
 ```{r}
-random_variable <- rchisq(nrow(scored_data), 7)
-fake_model <- lm(random_variable ~ .,
-                 data = scored_data[ , -c(1:69)])
-standardized <- rstudent(fake_model) # residuals
-fitvalues <- scale(fake_model$fitted.values) # z-score them
+mvntest_result <- mvn(scored_data[8:69], mvnTest = "hz")
+mvntest_result$multivariateNormality
+```
+# Assumption: Kurtosis
+```{r}
+mvnorm.kur.test(scored_data[8:69], method = "simulation")
 ```
 
-# Linearity
-- We assume the the multivariate relationship between continuous variables is linear (i.e., no curved)
-- There are many ways to test this, but we can use a QQ/PP Plot to examine for linearity
-
+# Assumption: Skewness
 ```{r}
-plot(fake_model, 2)
+mvnorm.skew.test(scored_data[8:69])
 ```
 
-
-# Normality
-- We expect that the residuals are normally distributed
+# Frequency tables
 ```{r}
-hist(standardized)
+# Gender
+gender_freq <- scored_data %>% tabyl(gender)
+levels(gender_freq$gender) <- c("male","female", "non-binary", "DWA")
+apa_table(gender_freq, caption = "Proportions of Gender")
 ```
 
-
-#Assumptions Homogeneity and Homoscedasticity
-- These assumptions are about equality of the variances
-- Here the assumption is equality in the spread of variance across predicted values 
-
 ```{r}
-{plot(standardized, fitvalues)
-  abline(v = 0)
-  abline(h = 0)
-}
+# Education
+edu_freq <- scored_data %>% tabyl(Edu)
+levels(edu_freq$Edu) <- c("Elementary or lower","Highschool Diploma", "Bachelor's", "Master's", "PhD or higher")
+apa_table(edu_freq, caption = "Proportions of Education level")
 ```
-
-
-```{r}
-# Check for duplicates
-sum(duplicated(scored_data))
-```
-
-
-```{r}
-# Check demographics
-scored_data$gender <- factor(scored_data$gender, levels=c(1,2,3,4)) # Factor gender
-summary(scored_data$gender)
-```
-
 
 # Descriptives
 - In the first step, the data are summarized to get the descriptive statistics.
@@ -382,55 +356,21 @@ income_plot<-hist(scored_data$SES,
 ```
 
 
-# Mean centre all IVs
-```{r}
-# Mean centre all IVs for regressions with interaction terms
-centre_data_to_csv <- function(scored_data){
-  centred_data <- scored_data %>%
-  mutate(CRA_c = scale(mean_cra, center = TRUE, scale = FALSE),
-         SES_c = scale(SES, center = TRUE, scale = FALSE),
-         PSS_c = scale(mean_pss, center = TRUE, scale = FALSE),
-         HCRU_c = scale(mean_hcru, center = TRUE, scale = FALSE),
-         BSM_c = scale(mean_bsm, center = TRUE, scale = FALSE),
-         POS_c = scale(sum_pos, center = TRUE, scale = FALSE),
-         NEG_c = scale(sum_neg, center = TRUE, scale = FALSE),
-         CC_c = scale(sum_cc, center = TRUE, scale = FALSE),
-         NC_c = scale(sum_nc, center = TRUE, scale = FALSE),
-         CSC_c = scale(sum_csc, center = TRUE, scale = FALSE),
-         MCQ_c = scale(sum_MCQ, center = TRUE, scale = FALSE))%>%
-
-  # select the scores/final variables used, remove the raw items
-  select(Age, gender, Edu, sum_cesd, SES_c , CRA_c, PSS_c, HCRU_c, BSM_c, POS_c, NEG_c, CC_c, CSC_c,MCQ_c)
-
-  # Save prepared data
-  write.csv(centred_data,"ready_for_analysis.csv", row.names = FALSE)
-
-return(centred_data)
-}
-```
-
-
-# read prepared data for analysis
-```{r}
-ready_for_analysis <- centre_data_to_csv(scored_data)
-```
-
-
 ```{r}
 # Rename variables for convenience in modelling
-data <- ready_for_analysis %>% mutate(rename(ready_for_analysis,
-                                "X" = "CRA_c",
+analyze_data <- scored_data %>% mutate(rename(scored_data,
+                                "X" = "mean_cra", 
                                 "Y" = "sum_cesd",
-                                "W" = "SES_c",
-                                "Z" = "BSM_c",
-                                "COV" = "PSS_c",
-                               "M" = "NEG_c"))
+                                "W" = "SES",
+                                "Z" = "mean_bsm",
+                                "COV" = "mean_pss",
+                               "M" = "sum_neg"))
 ```
 
 Create interaction terms
 ```{r}
 # Create interaction terms
-data <- data %>% mutate(X.W = X * W,
+analyze_data <- analyze_data %>% mutate(X.W = X * W,
                         X.Z = X * Z,
                         W.Z = W * Z,
                         X.W.Z = X * W * Z,
@@ -449,12 +389,10 @@ MOD.MED.model <-
 M ~ a*X
 
 # Outcome being predicted by the model
-Y ~ c1*X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z +
-b1*M + b2*W + b3*Z + b4*M.W + b5*M.Z + b6*W.Z + b7*M.W.Z + g*COV
+Y ~ g*COV + c1*X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z +
+b1*M + b2*W + b3*Z + b4*M.W + b5*M.Z + b6*W.Z + b7*M.W.Z 
 
-# Covariance: A main predictor's covariance is fixed so it does not 
-# covary with the rest of the variables, since the theory does not explicitely address this
-COV ~~ COV
+# Covariance: Let all variables covary
 
 # Intercept and variance of W for conditional effects analysis
 W ~ W.mean*1
@@ -499,8 +437,9 @@ prop.mediated.above := indirect.above / total.above
 ```{r}
 # Fit the model
 Mod.Med.SEM <- sem(model = MOD.MED.model,
-                   data = data,
+                   data = analyze_data,
                    se = "bootstrap",
+                   test = "bootstrap",
                    bootstrap = 5000) # do 5000 when actually running the code
 ```
 
@@ -513,13 +452,13 @@ summary(Mod.Med.SEM, fit.measures = FALSE, standardize = TRUE, rsquare = TRUE)
 
 ```{r}
 # Parameters table
-parameterEstimates(Mod.Med.SEM, remove.nonfree = TRUE)
+parameterEstimates(Mod.Med.SEM, remove.nonfree = TRUE, ci = TRUE, pvalue = TRUE, output = "pretty")
 ```
 
 # Plot the moderated mediation model
 ```{r}
 # Plot model
-plot = semPaths(Mod.Med.SEM, fixedStyle = 1, layout = "tree", 
-                  intercepts = F, label.scale=T, nCharNodes = 0, 
-                  sizeMan2=3, sizeMan=7, asize=2, residuals = F, exoCov = T)
+plot = semPaths(Mod.Med.SEM, fixedStyle = 1, layout = "tree", whatLabels = "est",
+                  intercepts = F, label.scale=T, nCharNodes = 5, 
+                  sizeMan2=3, sizeMan=6, asize=2, residuals = F, exoCov = F)
 ```
