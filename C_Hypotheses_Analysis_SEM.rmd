@@ -41,34 +41,6 @@ mice_plot <- aggr(df_adjr,numbers=TRUE, sortVars=TRUE,
                     gap=3, ylab=c("Missing data","Pattern"))
 ```
 
-# Function to handle missing data according to replication protocol
-```{r}
-Rep_exclusion_criteria <-function(df_adjr){
-  # 1. exclude all who didn't complete the survey or had missing data
-  no_missing <- drop_na(df_adjr)
-  
-  # 2. exclude participants with zero variance among their answers
-  no_zero_var <- no_missing[apply(no_missing[, -c(1:4)], 1, var) != 0, ]
-  
-  # 3. exclude participants who took less than 3 minutes (180 seconds) to complete the survey
-  clean_data <- no_zero_var %>% filter(duration >= 180)
-  
-  # Check for duplicates
-  sum(duplicated(clean_data))
-  
-  return(clean_data)
-}
-```
-
-```{r}
-clean_data_2 <- Rep_exclusion_criteria(df_adjr) # cleaned data based on replication protocol
-```
-
-# Data summary based on replication protocol's exclusion criteria
-```{r}
-describe(clean_data_2)
-```
-
 # IMPUTATION
 - exclude individuals with more than five percent missing data.
 ```{r}
