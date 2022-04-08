@@ -356,8 +356,7 @@ MOD.MED.model <-
 M ~ a*X
 
 # Outcome being predicted by the model
-Y ~ g*COV + c1*X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z +
-b1*M + b2*W + b3*Z + b4*M.W + b5*M.Z + b6*W.Z + b7*M.W.Z 
+Y ~ g*COV + c1*X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z + b1*M + b2*W + b3*Z + b4*M.W + b5*M.Z + b6*W.Z + b7*M.W.Z 
 
 # Covariance: Let all variables covary
 
@@ -369,11 +368,18 @@ W ~~ W.var * W
 Z ~ Z.mean*1
 Z ~~ Z.var*Z
 
+# interaction terms for simple slopes
+INT_Mean := W.mean*Z.mean
+INT_LwLz := (W.mean - sqrt(W.var))*(Z.mean - sqrt(Z.var))
+INT_LwHz := (W.mean - sqrt(W.var))*(Z.mean + sqrt(Z.var))
+INT_HwLz := (W.mean + sqrt(W.var))*(Z.mean - sqrt(Z.var))
+INT_HwHz := (W.mean + sqrt(W.var))*(Z.mean + sqrt(Z.var))
+
 # Indirect effect of X on Y through M, conditional on mean values of W and Z
-indirect := (a) * ( b1 + b4*W.mean + b5*Z.mean)
+indirect := (a) * ( b1 + b4*W + b5*Z + b7*W.Z)
 
 # Direct effect of X on Y, moderated by W and Z
-direct := c1 + c4*W.mean + c5*Z.mean
+direct := c1 + c4*W + c5*Z + c7*W.Z
 
 # Total effect
 total := direct + indirect
@@ -382,20 +388,18 @@ total := direct + indirect
 prop.mediated := indirect / total
 
 # Conditional indirect effect through mediator (M)
-indirect.below :=(a)*(b1+b4*(W.mean - sqrt(W.var))+ b5*(Z.mean - sqrt(Z.var)))
-indirect.above :=(a)*(b1+b4*(W.mean + sqrt(W.var))+ b5*(Z.mean + sqrt(Z.var)))
+indirect.Mean :=(a)*(b1+b4*(W.mean)+ b5*(Z.mean) + b7*INT_Mwz)
+indirect.LwLz :=(a)*(b1+b4*(W.mean - sqrt(W.var))+ b5*(Z.mean - sqrt(Z.var)) + b7*INT_LwLz)
+indirect.LwHz :=(a)*(b1+b4*(W.mean - sqrt(W.var))+ b5*(Z.mean + sqrt(Z.var)) + b7*INT_LwHz)
+indirect.HwLz :=(a)*(b1+b4*(W.mean + sqrt(W.var))+ b5*(Z.mean - sqrt(Z.var)) + b7*INT_HwLz)
+indirect.HwHz :=(a)*(b1+b4*(W.mean + sqrt(W.var))+ b5*(Z.mean + sqrt(Z.var)) + b7*INT_HwHz)
 
 # Conditional direct effect moderated by W and Z
-direct.below:=c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var))
-direct.above:=c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var))
-
-# Conditional total effect
-total.below := direct.below + indirect.below
-total.above := direct.above + indirect.above
-
-# Proportion of mediation under conditions of W and one SD above or below mean
-prop.mediated.below := indirect.below / total.below
-prop.mediated.above := indirect.above / total.above
+direct.Mean:=c1 + c4*(W.mean) + c5*(Z.mean)+ c7*INT_Mean
+direct.LwLz:=c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var)) + c7*INT_LwLz
+direct.LwHz:=c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7*INT_LwHz
+direct.HwLz:=c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var)) + c7*INT_HwLz
+direct.HwHz:=c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7*INT_HwHz
 "
 ```
 
@@ -405,6 +409,7 @@ Mod.Med.SEM <- sem(model = MOD.MED.model,
                    data = analyze_data,
                    se = "bootstrap",
                    test = "bootstrap",
+                   boot.ci.type = "perc",
                    bootstrap = 5000) # do 5000 when actually running the code
 ```
 # Model summary
