@@ -85,6 +85,11 @@ scored_data <- clean_data %>%
          sum_cesd, mean_pss)
 ```
 
+
+```{r}
+write.csv(clean_data, "clean_data_replication.csv") # Save scored data to a csv file
+```
+
 # Frequency table
 ```{r}
 gender_freq <- scored_data %>% tabyl(gender)
