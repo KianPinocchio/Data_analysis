@@ -184,7 +184,7 @@ scored_data <- function_score_data(no_outlier) # Score the data with no outliers
 ```
 
 ```{r Save data to csv, echo=TRUE}
-write.csv(scored_data, "scored_data_imputed.csv") # Save scored data in a csv file
+write.csv(scored_data, "scored_data_imputed.csv", row.names = FALSE) # Save scored data in a csv file
 ```
 
 # Summary of cleaned data and scored data
