@@ -1,0 +1,163 @@
+---
+title: "C_hypothesis_non-imputed"
+author: "Ali Soufizadeh"
+date: "06/04/2022"
+output: html_document
+---
+
+
+```{r include=FALSE}
+# Load packages
+pacman::p_load(pacman, tidyverse, kableExtra, psych, lavaan, corrplot, performance, MVN, ICS, dplyr,
+               matrixStats, semPlot, gridExtra,knitr, readxl, papaja, report, mice, VIM, rmarkdown, janitor)
+```
+
+```{r}
+scored_data <- read_csv("scored_data.csv")
+```
+
+# Summary of cleaned data 
+```{r}
+# Missing Data & outliers checked
+describe(scored_data)
+```
+
+# Assumptions: Additivity
+```{r}
+plot_data <- cbind(scored_data$SES,scored_data[ , -c(1:69)])
+corrplot(cor(plot_data))
+```
+
+# Assumption: Multivariate Normality
+```{r}
+mvntest_result <- mvn(scored_data[8:69], mvnTest = "hz")
+mvntest_result$multivariateNormality
+```
+# Assumption: Kurtosis
+```{r}
+mvnorm.kur.test(scored_data[8:69], method = "simulation")
+```
+
+# Assumption: Skewness
+```{r}
+mvnorm.skew.test(scored_data[8:69])
+```
+
+
+# Plot monthly family income
+```{r}
+income_plot<-hist(scored_data$SES,
+                  main="Family income distribution",
+                  xlab="family income category")
+```
+
+
+
+```{r}
+# Rename variables for convenience in modelling
+analyze_data <- scored_data %>% mutate(rename(scored_data,
+                                "X" = "mean_cra", 
+                                "Y" = "sum_cesd",
+                                "W" = "SES",
+                                "Z" = "mean_bsm",
+                                "COV" = "mean_pss",
+                                "M" = "sum_neg"))
+```
+
+Create interaction terms
+```{r}
+# Create interaction terms
+analyze_data <- analyze_data %>% mutate(X.W = X * W,
+                        X.Z = X * Z,
+                        W.Z = W * Z,
+                        X.W.Z = X * W * Z,
+                        M.W = M * W,
+                        M.Z = M * Z,
+                        M.W.Z = M * W * Z)
+```
+
+
+# Hypotheses C1 & C2: Moderated Mediation
+```{r}
+# The Model
+MOD.MED.model <-
+"
+# Mediator
+M ~ a*X
+
+# Outcome being predicted by the model
+Y ~ g*COV + c1*X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z + b1*M + b2*W + b3*Z + b4*M.W + b5*M.Z + b6*W.Z + b7*M.W.Z 
+
+# Covariance: Let all variables covary
+
+# Intercept and variance of W for conditional effects analysis
+W ~ W.mean*1
+W ~~ W.var * W
+
+# Intercept and variance of Z for conditional effects analysis
+Z ~ Z.mean*1
+Z ~~ Z.var*Z
+
+# interaction terms for simple slopes
+INT_Mean := W.mean*Z.mean
+INT_LwLz := (W.mean - sqrt(W.var))*(Z.mean - sqrt(Z.var))
+INT_LwHz := (W.mean - sqrt(W.var))*(Z.mean + sqrt(Z.var))
+INT_HwLz := (W.mean + sqrt(W.var))*(Z.mean - sqrt(Z.var))
+INT_HwHz := (W.mean + sqrt(W.var))*(Z.mean + sqrt(Z.var))
+
+# Indirect effect of X on Y through M, conditional on mean values of W and Z
+indirect := (a) * ( b1 + b4*W + b5*Z + b7*W.Z)
+
+# Direct effect of X on Y, moderated by W and Z
+direct := c1 + c4*W + c5*Z + c7*W.Z
+
+# Total effect
+total := direct + indirect
+
+# Proportion of effect mediated
+prop.mediated := indirect / total
+
+# Conditional indirect effect through mediator (M)
+indirect.Mean :=(a)*(b1+b4*(W.mean)+ b5*(Z.mean) + b7*INT_Mwz)
+indirect.LwLz :=(a)*(b1+b4*(W.mean - sqrt(W.var))+ b5*(Z.mean - sqrt(Z.var)) + b7*INT_LwLz)
+indirect.LwHz :=(a)*(b1+b4*(W.mean - sqrt(W.var))+ b5*(Z.mean + sqrt(Z.var)) + b7*INT_LwHz)
+indirect.HwLz :=(a)*(b1+b4*(W.mean + sqrt(W.var))+ b5*(Z.mean - sqrt(Z.var)) + b7*INT_HwLz)
+indirect.HwHz :=(a)*(b1+b4*(W.mean + sqrt(W.var))+ b5*(Z.mean + sqrt(Z.var)) + b7*INT_HwHz)
+
+# Conditional direct effect moderated by W and Z
+direct.Mean:=c1 + c4*(W.mean) + c5*(Z.mean)+ c7*INT_Mean
+direct.LwLz:=c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var)) + c7*INT_LwLz
+direct.LwHz:=c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7*INT_LwHz
+direct.HwLz:=c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var)) + c7*INT_HwLz
+direct.HwHz:=c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7*INT_HwHz
+"
+```
+
+
+```{r}
+# Fit the model
+Mod.Med.SEM <- sem(model = MOD.MED.model,
+                   data = analyze_data,
+                   se = "bootstrap",
+                   test = "bootstrap",
+                   bootstrap = 5000) # do 5000 when actually running the code
+```
+
+
+```{r}
+# Model summary
+summary(Mod.Med.SEM, fit.measures = FALSE, standardize = TRUE, rsquare = TRUE)
+```
+
+```{r}
+# Parameters table
+parameterEstimates(Mod.Med.SEM, remove.nonfree = TRUE, ci = TRUE, pvalue = TRUE, output = "pretty")
+```
+
+# Plot the moderated mediation model
+```{r}
+# Plot model
+plot = semPaths(Mod.Med.SEM, fixedStyle = 1, layout = "tree", whatLabels = "est",
+                  intercepts = F, label.scale=T, nCharNodes = 5, 
+                  sizeMan2=3, sizeMan=6, asize=2, residuals = F, exoCov = F)
+```
