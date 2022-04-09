@@ -75,6 +75,8 @@ scored_data <- clean_data %>%
   select(Age, SES, Edu, gender, mean_cra, mean_hcru,
          sum_cesd, mean_pss)
 
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+write.csv(scored_data, "scored_data.csv", row.names = FALSE) # Save scored data in a csv file
 
 ## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 gender_freq <- scored_data %>% tabyl(gender)
