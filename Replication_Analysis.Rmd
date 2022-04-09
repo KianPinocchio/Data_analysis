@@ -18,10 +18,15 @@ raw_data <- read_excel("Coded_data.xlsx")
 ```
 
 ```{r}
-# Change column names
-raw_data <- rename(raw_data, 
-                   "duration" = "Duration(Second)",
+# Change variable names
+raw_data <- rename(raw_data,
+                   "duration" = "Duration(Second)", # in seconds
                    "gender" = "Sex")
+
+columns = c("id", "Platform", "consent","duration", "Age","gender", "Edu", "SES")
+demographics <- subset(raw_data, select = columns) 
+raw_data <- raw_data[ , ! names(raw_data) %in% columns]
+raw_data <- cbind(demographics, raw_data)
 ```
 
 # Raw data
@@ -79,15 +84,12 @@ scored_data <- clean_data %>%
          mean_hcru = rowMeans(select(., starts_with("HCRU"))),
          mean_pss = rowMeans(select(., starts_with("PSS"))),
          mean_bsm = rowMeans(select(., starts_with("BSM"))),
-         sum_cesd = rowSums(select(., starts_with("CES_D"))))%>%
-         
-  select(Age, SES, Edu, gender, mean_cra, mean_hcru,
-         sum_cesd, mean_pss)
+         sum_cesd = rowSums(select(., starts_with("CES_D"))))
 ```
 
 
 ```{r}
-write.csv(clean_data, "clean_data_replication.csv") # Save scored data to a csv file
+write.csv(clean_data, "scored_data_replication.csv") # Save scored data to a csv file
 ```
 
 # Frequency table
