@@ -1,0 +1,555 @@
+---
+title: "C1_Imp_NEG"
+author: "Ali Soufizadeh"
+date: "10/04/2022"
+output: html_document
+---
+
+# Set seed
+```{r}
+set.seed(79)
+```
+
+# Load packages
+```{r}
+# Load packages
+pacman::p_load(pacman, tidyverse, kableExtra, psych, lavaan, dplyr, semPlot, knitr, readxl, rmarkdown)
+```
+
+# Read data
+```{r}
+# imputed data
+analyze_data <- read_csv("/Users/Pinocchio/R/Thesis_git_repository/Data_analysis/Data/C_Imp_scored.csv")
+```
+
+# Imputed data Descriptives
+```{r}
+describe(cbind(analyze_data[,5:8],analyze_data[,70:79]))
+```
+
+# Variables guide
+
+**Meta-cogitions Questionnaire subscales**
+
+- pos: positive beliefs about worry
+- neg: negative beliefs about un-controllability of worry
+- cc: cognitive confidence
+- nc: need for control
+- csc: cognitive self-consciences
+
+*replace the latent variable with appropriate items everytime you run the code.*
+
+
+**Predictors**
+
+- CRA: Cognitive reappraisal ability
+- CES-D: Depressive symptoms
+- PSS: Perceived Life stress
+- SES: Monthly family income / socioeconomic status
+- BSM: Beliefs about Socioeconomic Mobility
+- Mi = Mediator; a subscale from the MCQ subscales
+- X = CRA, Y = CES-D, COV = PSS, W = SES, Z = BSM
+
+# Create models without probing
+```{r}
+# negative beliefs about worry
+MOD.MED.model.neg <-
+"
+# Mediator
+sum_neg ~  a*X + b2*W + b3*Z + b4*W.Z + d1*COV 
+
+# Outcome being predicted by the model
+Y ~ c1 * X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z + b1*sum_neg + d*COV
+
+# Effects
+indirect := a * (b1 + b2 + b3 + b4)
+direct:= c1 + c4 + c5 + c7
+
+# Total effect
+total := direct + indirect
+"
+
+# positive beliefs about worry
+MOD.MED.model.pos <-
+"
+# Mediator
+sum_pos ~  a*X + b2*W + b3*Z + b4*W.Z + d1*COV 
+
+# Outcome being predicted by the model
+Y ~ c1 * X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z + b1*sum_pos + d*COV
+
+# Effects
+indirect := a * (b1 + b2 + b3 + b4)
+direct:= c1 + c4 + c5 + c7
+
+# Total effect
+total := direct + indirect
+"
+
+# need for control
+MOD.MED.model.nc <-
+"
+# Mediator
+sum_nc ~  a*X + b2*W + b3*Z + b4*W.Z + d1*COV 
+
+# Outcome being predicted by the model
+Y ~ c1 * X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z + b1*sum_nc + d*COV
+
+# Effects
+indirect := a * (b1 + b2 + b3 + b4)
+direct:= c1 + c4 + c5 + c7
+
+# Total effect
+total := direct + indirect
+"
+
+# Cognitive self-conscience
+MOD.MED.model.csc <-
+"
+# Mediator
+sum_csc ~  a*X + b2*W + b3*Z + b4*W.Z + d1*COV 
+
+# Outcome being predicted by the model
+Y ~ c1 * X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z + b1*sum_csc + d*COV
+
+# Effects
+indirect := a * (b1 + b2 + b3 + b4)
+direct:= c1 + c4 + c5 + c7
+
+# Total effect
+total := direct + indirect
+"
+
+# Cognitive confidence
+MOD.MED.model.cc <-
+"
+# Mediator
+sum_cc ~  a*X + b2*W + b3*Z + b4*W.Z + d1*COV 
+
+# Outcome being predicted by the model
+Y ~ c1 * X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z + b1*sum_cc + d*COV
+
+# Effects
+indirect := a * (b1 + b2 + b3 + b4)
+direct:= c1 + c4 + c5 + c7
+
+# Total effect
+total := direct + indirect
+"
+```
+
+# Fit model without probing
+```{r}
+# Fit the model
+Mod.Med.fit.neg <- sem(model = MOD.MED.model.neg,
+                   meanstructure = TRUE,
+                   data = analyze_data)
+
+Mod.Med.fit.pos <- sem(model = MOD.MED.model.pos,
+                   meanstructure = TRUE,
+                   data = analyze_data)
+
+Mod.Med.fit.nc <- sem(model = MOD.MED.model.nc,
+                   meanstructure = TRUE,
+                   data = analyze_data)
+
+Mod.Med.fit.cc <- sem(model = MOD.MED.model.cc,
+                   meanstructure = TRUE,
+                   data = analyze_data)
+
+Mod.Med.fit.csc <- sem(model = MOD.MED.model.csc,
+                   meanstructure = TRUE,
+                   data = analyze_data)
+```
+
+# neg Model summary without probing
+```{r}
+summary(Mod.Med.fit.neg, fit.measures = TRUE, rsquare = TRUE)
+```
+
+# pos Model summary without probing
+```{r}
+summary(Mod.Med.fit.pos, fit.measures = TRUE, rsquare = TRUE)
+```
+
+# nc Model summary without probing
+```{r}
+summary(Mod.Med.fit.nc, fit.measures = TRUE, rsquare = TRUE)
+```
+
+# cc Model summary without probing
+```{r}
+summary(Mod.Med.fit.cc, fit.measures = TRUE, rsquare = TRUE)
+```
+
+# csc Model summary without probing
+```{r}
+summary(Mod.Med.fit.neg, fit.measures = TRUE, rsquare = TRUE)
+```
+
+# Moderated Mediation: Probe simple slopes
+```{r}
+# NEG
+Mod.Med.Model.neg <-
+"
+# Mediator
+sum_neg ~  a*X + b2*W + b3*Z + b4*W.Z + d1*COV 
+
+# Outcome being predicted by the model
+Y ~ c1 * X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z + b1*sum_neg + d*COV
+
+# Effects
+indirect := a * (b1 + b2 + b3 + b4)
+direct:= c1 + c4 + c5 + c7
+
+# Total effect
+total := direct + indirect
+
+# Intercepts and variance for conditional effects analysis
+W ~ W.mean*1
+Z ~ Z.mean*1
+
+# variances for conditional effects analysis
+W ~~ W.var * W
+Z ~~ Z.var * Z
+
+# Conditional indirect effect moderated by W and Z: a * (b1 + b2 + b3 + b4)
+indirect.LwLz:= a * (b1 + b2 * (W.mean - sqrt(W.var)) + b3 * (Z.mean - sqrt(Z.var)) + b4 * (W.mean - sqrt(W.var)) * (Z.mean - sqrt(Z.var)))
+indirect.LwHz:= a * (b1 + b2 * (W.mean - sqrt(W.var)) + b3 * (Z.mean + sqrt(Z.var)) + b4 * (W.mean - sqrt(W.var)) * (Z.mean + sqrt(Z.var)))
+indirect.HwLz:= a * (b1 + b2 * (W.mean + sqrt(W.var)) + b3 * (Z.mean - sqrt(Z.var)) + b4 * (W.mean + sqrt(W.var)) * (Z.mean - sqrt(Z.var)))
+indirect.HwHz:= a * (b1 + b2 * (W.mean + sqrt(W.var)) + b3 * (Z.mean + sqrt(Z.var)) + b4 * (W.mean + sqrt(W.var)) * (Z.mean + sqrt(Z.var)))
+
+# Conditional direct effect moderated by W and Z: c1 + c4 + c5 + c7
+direct.LwLz:= c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var)) + c7 * (W.mean - sqrt(W.var)) * (Z.mean - sqrt(Z.var))
+direct.LwHz:= c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7 * (W.mean - sqrt(W.var)) * (Z.mean + sqrt(Z.var))
+direct.HwLz:= c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var)) + c7 * (W.mean + sqrt(W.var)) * (Z.mean - sqrt(Z.var))
+direct.HwHz:= c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7 * (W.mean + sqrt(W.var)) * (Z.mean + sqrt(Z.var))
+"
+
+# POS
+Mod.Med.Model.pos <-
+"
+# Mediator
+sum_pos ~  a*X + b2*W + b3*Z + b4*W.Z + d1*COV 
+
+# Outcome being predicted by the model
+Y ~ c1 * X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z + b1*sum_pos + d*COV
+
+# Effects
+indirect := a * (b1 + b2 + b3 + b4)
+direct:= c1 + c4 + c5 + c7
+
+# Total effect
+total := direct + indirect
+
+# Intercepts and variance for conditional effects analysis
+W ~ W.mean*1
+Z ~ Z.mean*1
+
+# variances for conditional effects analysis
+W ~~ W.var * W
+Z ~~ Z.var * Z
+
+# Conditional indirect effect moderated by W and Z: a * (b1 + b2 + b3 + b4)
+indirect.LwLz:= a * (b1 + b2 * (W.mean - sqrt(W.var)) + b3 * (Z.mean - sqrt(Z.var)) + b4 * (W.mean - sqrt(W.var)) * (Z.mean - sqrt(Z.var)))
+indirect.LwHz:= a * (b1 + b2 * (W.mean - sqrt(W.var)) + b3 * (Z.mean + sqrt(Z.var)) + b4 * (W.mean - sqrt(W.var)) * (Z.mean + sqrt(Z.var)))
+indirect.HwLz:= a * (b1 + b2 * (W.mean + sqrt(W.var)) + b3 * (Z.mean - sqrt(Z.var)) + b4 * (W.mean + sqrt(W.var)) * (Z.mean - sqrt(Z.var)))
+indirect.HwHz:= a * (b1 + b2 * (W.mean + sqrt(W.var)) + b3 * (Z.mean + sqrt(Z.var)) + b4 * (W.mean + sqrt(W.var)) * (Z.mean + sqrt(Z.var)))
+
+# Conditional direct effect moderated by W and Z: c1 + c4 + c5 + c7
+direct.LwLz:= c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var)) + c7 * (W.mean - sqrt(W.var)) * (Z.mean - sqrt(Z.var))
+direct.LwHz:= c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7 * (W.mean - sqrt(W.var)) * (Z.mean + sqrt(Z.var))
+direct.HwLz:= c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var)) + c7 * (W.mean + sqrt(W.var)) * (Z.mean - sqrt(Z.var))
+direct.HwHz:= c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7 * (W.mean + sqrt(W.var)) * (Z.mean + sqrt(Z.var))
+"
+
+# NC
+Mod.Med.Model.nc <-
+"
+# Mediator
+sum_nc ~  a*X + b2*W + b3*Z + b4*W.Z + d1*COV 
+
+# Outcome being predicted by the model
+Y ~ c1 * X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z + b1*sum_nc + d*COV
+
+# Effects
+indirect := a * (b1 + b2 + b3 + b4)
+direct:= c1 + c4 + c5 + c7
+
+# Total effect
+total := direct + indirect
+
+# Intercepts and variance for conditional effects analysis
+W ~ W.mean*1
+Z ~ Z.mean*1
+
+# variances for conditional effects analysis
+W ~~ W.var * W
+Z ~~ Z.var * Z
+
+# Conditional indirect effect moderated by W and Z: a * (b1 + b2 + b3 + b4)
+indirect.LwLz:= a * (b1 + b2 * (W.mean - sqrt(W.var)) + b3 * (Z.mean - sqrt(Z.var)) + b4 * (W.mean - sqrt(W.var)) * (Z.mean - sqrt(Z.var)))
+indirect.LwHz:= a * (b1 + b2 * (W.mean - sqrt(W.var)) + b3 * (Z.mean + sqrt(Z.var)) + b4 * (W.mean - sqrt(W.var)) * (Z.mean + sqrt(Z.var)))
+indirect.HwLz:= a * (b1 + b2 * (W.mean + sqrt(W.var)) + b3 * (Z.mean - sqrt(Z.var)) + b4 * (W.mean + sqrt(W.var)) * (Z.mean - sqrt(Z.var)))
+indirect.HwHz:= a * (b1 + b2 * (W.mean + sqrt(W.var)) + b3 * (Z.mean + sqrt(Z.var)) + b4 * (W.mean + sqrt(W.var)) * (Z.mean + sqrt(Z.var)))
+
+# Conditional direct effect moderated by W and Z: c1 + c4 + c5 + c7
+direct.LwLz:= c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var)) + c7 * (W.mean - sqrt(W.var)) * (Z.mean - sqrt(Z.var))
+direct.LwHz:= c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7 * (W.mean - sqrt(W.var)) * (Z.mean + sqrt(Z.var))
+direct.HwLz:= c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var)) + c7 * (W.mean + sqrt(W.var)) * (Z.mean - sqrt(Z.var))
+direct.HwHz:= c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7 * (W.mean + sqrt(W.var)) * (Z.mean + sqrt(Z.var))
+"
+
+# CC
+Mod.Med.Model.cc <-
+"
+# Mediator
+sum_cc ~  a*X + b2*W + b3*Z + b4*W.Z + d1*COV 
+
+# Outcome being predicted by the model
+Y ~ c1 * X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z + b1*sum_cc + d*COV
+
+# Effects
+indirect := a * (b1 + b2 + b3 + b4)
+direct:= c1 + c4 + c5 + c7
+
+# Total effect
+total := direct + indirect
+
+# Intercepts and variance for conditional effects analysis
+W ~ W.mean*1
+Z ~ Z.mean*1
+
+# variances for conditional effects analysis
+W ~~ W.var * W
+Z ~~ Z.var * Z
+
+# Conditional indirect effect moderated by W and Z: a * (b1 + b2 + b3 + b4)
+indirect.LwLz:= a * (b1 + b2 * (W.mean - sqrt(W.var)) + b3 * (Z.mean - sqrt(Z.var)) + b4 * (W.mean - sqrt(W.var)) * (Z.mean - sqrt(Z.var)))
+indirect.LwHz:= a * (b1 + b2 * (W.mean - sqrt(W.var)) + b3 * (Z.mean + sqrt(Z.var)) + b4 * (W.mean - sqrt(W.var)) * (Z.mean + sqrt(Z.var)))
+indirect.HwLz:= a * (b1 + b2 * (W.mean + sqrt(W.var)) + b3 * (Z.mean - sqrt(Z.var)) + b4 * (W.mean + sqrt(W.var)) * (Z.mean - sqrt(Z.var)))
+indirect.HwHz:= a * (b1 + b2 * (W.mean + sqrt(W.var)) + b3 * (Z.mean + sqrt(Z.var)) + b4 * (W.mean + sqrt(W.var)) * (Z.mean + sqrt(Z.var)))
+
+# Conditional direct effect moderated by W and Z: c1 + c4 + c5 + c7
+direct.LwLz:= c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var)) + c7 * (W.mean - sqrt(W.var)) * (Z.mean - sqrt(Z.var))
+direct.LwHz:= c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7 * (W.mean - sqrt(W.var)) * (Z.mean + sqrt(Z.var))
+direct.HwLz:= c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var)) + c7 * (W.mean + sqrt(W.var)) * (Z.mean - sqrt(Z.var))
+direct.HwHz:= c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7 * (W.mean + sqrt(W.var)) * (Z.mean + sqrt(Z.var))
+"
+
+# CSC
+Mod.Med.Model.csc <-
+"
+# Mediator
+sum_csc ~  a*X + b2*W + b3*Z + b4*W.Z + d1*COV 
+
+# Outcome being predicted by the model
+Y ~ c1 * X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z + b1*sum_csc + d*COV
+
+# Effects
+indirect := a * (b1 + b2 + b3 + b4)
+direct:= c1 + c4 + c5 + c7
+
+# Total effect
+total := direct + indirect
+
+# Intercepts and variance for conditional effects analysis
+W ~ W.mean*1
+Z ~ Z.mean*1
+
+# variances for conditional effects analysis
+W ~~ W.var * W
+Z ~~ Z.var * Z
+
+# Conditional indirect effect moderated by W and Z: a * (b1 + b2 + b3 + b4)
+indirect.LwLz:= a * (b1 + b2 * (W.mean - sqrt(W.var)) + b3 * (Z.mean - sqrt(Z.var)) + b4 * (W.mean - sqrt(W.var)) * (Z.mean - sqrt(Z.var)))
+indirect.LwHz:= a * (b1 + b2 * (W.mean - sqrt(W.var)) + b3 * (Z.mean + sqrt(Z.var)) + b4 * (W.mean - sqrt(W.var)) * (Z.mean + sqrt(Z.var)))
+indirect.HwLz:= a * (b1 + b2 * (W.mean + sqrt(W.var)) + b3 * (Z.mean - sqrt(Z.var)) + b4 * (W.mean + sqrt(W.var)) * (Z.mean - sqrt(Z.var)))
+indirect.HwHz:= a * (b1 + b2 * (W.mean + sqrt(W.var)) + b3 * (Z.mean + sqrt(Z.var)) + b4 * (W.mean + sqrt(W.var)) * (Z.mean + sqrt(Z.var)))
+
+# Conditional direct effect moderated by W and Z: c1 + c4 + c5 + c7
+direct.LwLz:= c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var)) + c7 * (W.mean - sqrt(W.var)) * (Z.mean - sqrt(Z.var))
+direct.LwHz:= c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7 * (W.mean - sqrt(W.var)) * (Z.mean + sqrt(Z.var))
+direct.HwLz:= c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var)) + c7 * (W.mean + sqrt(W.var)) * (Z.mean - sqrt(Z.var))
+direct.HwHz:= c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7 * (W.mean + sqrt(W.var)) * (Z.mean + sqrt(Z.var))
+"
+```
+
+
+# Fit probed models
+```{r}
+# NEG
+Mod.Med.fit.pneg <- sem(model = Mod.Med.Model.neg,
+                   data = analyze_data,
+                   se = "bootstrap",
+                   meanstructure = TRUE,
+                   bootstrap = 1000)
+# POS
+Mod.Med.fit.ppos <- sem(model = Mod.Med.Model.pos,
+                   data = analyze_data,
+                   se = "bootstrap",
+                   meanstructure = TRUE,
+                   bootstrap = 1000)
+
+# NC
+Mod.Med.fit.pnc <- sem(model = Mod.Med.Model.nc,
+                   data = analyze_data,
+                   se = "bootstrap",
+                   meanstructure = TRUE,
+                   bootstrap = 1000)
+
+# CC
+Mod.Med.fit.pcc <- sem(model = Mod.Med.Model.cc,
+                   data = analyze_data,
+                   se = "bootstrap",
+                   meanstructure = TRUE,
+                   bootstrap = 1000)
+
+# CSC
+Mod.Med.fit.pcsc <- sem(model = Mod.Med.Model.csc,
+                   data = analyze_data,
+                   se = "bootstrap",
+                   meanstructure = TRUE,
+                   bootstrap = 1000)
+```
+
+#-------------------------------------------------------------------------------
+# NEG Summary
+probed summary
+```{r}
+summary(Mod.Med.fit.pneg, fit.measures = TRUE, standardize = TRUE, rsquare = TRUE)
+```
+
+Parameters table
+```{r}
+parameterEstimates(Mod.Med.fit.pneg, remove.nonfree = TRUE, ci = TRUE, 
+                   boot.ci.type = "perc", pvalue = TRUE, output = "pretty")
+```
+
+probed Paths plot
+```{r}
+# Plot model
+plot = semPaths(Mod.Med.fit.pneg, fixedStyle = 2, layout = "tree2", whatLabels = "est",
+                  intercepts = F, label.scale=T, nCharNodes = 4,
+                  sizeMan2=4, sizeMan=4.5, asize=1.5, residuals = T, exoCov = F)
+```
+
+probed Covariances table
+```{r}
+cov_table <- data.frame(vcov(Mod.Med.fit.pneg))
+write.csv(cov_table , "C_imp_neg_cov.csv", row.names = T) # Save covariance matrix
+```
+
+
+
+
+#-------------------------------------------------------------------------------
+# POS Summary
+probed summary
+```{r}
+summary(Mod.Med.fit.ppos, fit.measures = TRUE, standardize = TRUE, rsquare = TRUE)
+```
+
+Parameters table
+```{r}
+parameterEstimates(Mod.Med.fit.ppos, remove.nonfree = TRUE, ci = TRUE, 
+                   boot.ci.type = "perc", pvalue = TRUE, output = "pretty")
+```
+
+probed Paths plot
+```{r}
+# Plot model
+plot = semPaths(Mod.Med.fit.ppos, fixedStyle = 2, layout = "tree2", whatLabels = "est",
+                  intercepts = F, label.scale=T, nCharNodes = 4,
+                  sizeMan2=4, sizeMan=4.5, asize=1.5, residuals = T, exoCov = F)
+```
+
+probed Covariances table
+```{r}
+cov_table <- data.frame(vcov(Mod.Med.fit.ppos))
+write.csv(cov_table , "C_imp_pos_cov.csv", row.names = T) # Save covariance matrix
+```
+
+
+#-------------------------------------------------------------------------------
+# NC Summary
+probed summary
+```{r}
+summary(Mod.Med.fit.pnc, fit.measures = TRUE, standardize = TRUE, rsquare = TRUE)
+```
+
+Parameters table
+```{r}
+parameterEstimates(Mod.Med.fit.pnc, remove.nonfree = TRUE, ci = TRUE, 
+                   boot.ci.type = "perc", pvalue = TRUE, output = "pretty")
+```
+
+probed Paths plot
+```{r}
+# Plot model
+plot = semPaths(Mod.Med.fit.pnc, fixedStyle = 2, layout = "tree2", whatLabels = "est",
+                  intercepts = F, label.scale=T, nCharNodes = 4,
+                  sizeMan2=4, sizeMan=4.5, asize=1.5, residuals = T, exoCov = F)
+```
+
+probed Covariances table
+```{r}
+cov_table <- data.frame(vcov(Mod.Med.fit.pnc))
+write.csv(cov_table , "C_imp_nc_cov.csv", row.names = T) # Save covariance matrix
+```
+
+
+#-------------------------------------------------------------------------------
+# CC Summary
+probed summary
+```{r}
+summary(Mod.Med.fit.pcc, fit.measures = TRUE, standardize = TRUE, rsquare = TRUE)
+```
+
+Parameters table
+```{r}
+parameterEstimates(Mod.Med.fit.pcc, remove.nonfree = TRUE, ci = TRUE, 
+                   boot.ci.type = "perc", pvalue = TRUE, output = "pretty")
+```
+
+probed Paths plot
+```{r}
+# Plot model
+plot = semPaths(Mod.Med.fit.pcc, fixedStyle = 2, layout = "tree2", whatLabels = "est",
+                  intercepts = F, label.scale=T, nCharNodes = 4,
+                  sizeMan2=4, sizeMan=4.5, asize=1.5, residuals = T, exoCov = F)
+```
+
+probed Covariances table
+```{r}
+cov_table <- data.frame(vcov(Mod.Med.fit.pcc))
+write.csv(cov_table , "C_imp_cc_cov.csv", row.names = T) # Save covariance matrix
+```
+
+
+#-------------------------------------------------------------------------------
+# CSC Summary
+probed summary
+```{r}
+summary(Mod.Med.fit.pcsc, fit.measures = TRUE, standardize = TRUE, rsquare = TRUE)
+```
+
+Parameters table
+```{r}
+parameterEstimates(Mod.Med.fit.pcsc, remove.nonfree = TRUE, ci = TRUE, 
+                   boot.ci.type = "perc", pvalue = TRUE, output = "pretty")
+```
+
+probed Paths plot
+```{r}
+# Plot model
+plot = semPaths(Mod.Med.fit.pcsc, fixedStyle = 2, layout = "tree2", whatLabels = "est",
+                  intercepts = F, label.scale=T, nCharNodes = 4,
+                  sizeMan2=4, sizeMan=4.5, asize=1.5, residuals = T, exoCov = F)
+```
+
+probed Covariances table
+```{r}
+cov_table <- data.frame(vcov(Mod.Med.fit.pcsc))
+write.csv(cov_table , "C_imp_csc_cov.csv", row.names = T) # Save covariance matrix
+```
