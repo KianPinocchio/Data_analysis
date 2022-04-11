@@ -15,9 +15,10 @@
 #   Change the things you can: Emotion regulation is more beneficial for people from lower than from higher socioeconomic status. 
 #     Emotion, 17(1), 141–154. https://doi.org/10.1037/emo0000210
 
+set.seed(79)
+
 # install packages ######################
 pacman::p_load(pacman, tidyverse, truncnorm, Runuran, dplyr)
-
 
 # simulation function ###################
 data_simulation_function <- function(N_total, 

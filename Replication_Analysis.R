@@ -3,6 +3,8 @@
 # author: "Alimohammad Soufizadeh"
 # date: "March, 2022"
 
+set.seed(79)
+
 ## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 pacman::p_load(pacman, tidyverse, kableExtra, psych, janitor, car, performance, 
                see,gridExtra, interactions, devtools,rmarkdown, 
@@ -61,6 +63,22 @@ summary(clean_data$gender)
 clean_data$Edu <- factor(clean_data$Edu, levels=c(1,2,3,4,5))
 summary(clean_data$Edu)
 
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------
+# Create MCQ subscale variable groups
+mcq_pos <- c("MCQ1","MCQ7","MCQ10",
+             "MCQ19","MCQ23","MCQ28")
+
+mcq_neg <- c("MCQ2","MCQ4","MCQ9",
+             "MCQ11","MCQ15","MCQ21")
+
+mcq_cc <- c("MCQ8","MCQ14","MCQ17",
+            "MCQ24","MCQ26","MCQ29")
+
+mcq_nc <- c("MCQ6","MCQ13","MCQ20",
+            "MCQ22","MCQ25","MCQ27")
+
+mcq_csc <- c("MCQ3","MCQ5","MCQ12",
+             "MCQ16","MCQ18","MCQ30")
 
 ## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 scored_data <- clean_data %>%
@@ -70,10 +88,19 @@ scored_data <- clean_data %>%
          mean_hcru = rowMeans(select(., starts_with("HCRU"))),
          mean_pss = rowMeans(select(., starts_with("PSS"))),
          mean_bsm = rowMeans(select(., starts_with("BSM"))),
-         sum_cesd = rowSums(select(., starts_with("CES_D"))))%>%
+         sum_cesd = rowSums(select(., starts_with("CES_D"))),
          
-  select(Age, SES, Edu, gender, mean_cra, mean_hcru,
-         sum_cesd, mean_pss)
+         mean_bsm = rowMeans(select(., starts_with("BSM"))),
+         #for cesd, we need the sum
+         sum_cesd = rowSums(select(., starts_with("CES_D"))),
+         
+         # sum all MCQ subscales
+         sum_pos = rowSums(select(.,all_of(mcq_pos))),
+         sum_neg = rowSums(select(.,all_of(mcq_neg))),
+         sum_cc = rowSums(select(.,all_of(mcq_cc))),
+         sum_nc = rowSums(select(.,all_of(mcq_nc))),
+         sum_csc = rowSums(select(.,all_of(mcq_csc))),
+         sum_MCQ = rowSums(select(.,starts_with("MCQ"))))
 
 ## ---------------------------------------------------------------------------------------------------------------------------------------------------------
 write.csv(scored_data, "scored_data.csv", row.names = FALSE) # Save scored data in a csv file
