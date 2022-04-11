@@ -2,7 +2,8 @@
 ## DATA Simulation
 ## Ali Soufizadeh
 
-set.seed(1)
+set.seed(79)
+
 # install packages ###########################
 pacman::p_load(pacman, caret, lars, tidyverse, MASS, truncnorm, Runuran,
                kableExtra,
