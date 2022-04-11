@@ -3,6 +3,8 @@
 # author: "Alimohammad Soufizadeh"
 # date: "March, 2022"
 
+set.seed(79)
+
 ## ----------------------------------------------------------------------------------------
 # Load packages
 pacman::p_load(pacman, tidyverse, kableExtra, psych, interactions,jtools,

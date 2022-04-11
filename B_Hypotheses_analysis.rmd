@@ -5,6 +5,10 @@ date: "March, 2022"
 ---
 
 ```{r}
+set.seed(79)
+```
+
+```{r}
 # Load packages
 pacman::p_load(pacman, tidyverse, kableExtra, psych, interactions,jtools,
                gridExtra,knitr, readxl, papaja, rmarkdown)
