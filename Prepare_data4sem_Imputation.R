@@ -1,27 +1,16 @@
----
-title: "Data analysis for the extension protocol of study: The interplay of cognitive reappraisal ability, socioeconomic status and mental health."
-author: "Alimohammad Soufizadeh"
-date: "March, 2022"
----
+# title: impute and clean data for SEM
+# date: "April, 2022"
 
-```{r set seed}
+## set seed
 set.seed(79)
-```
 
-```{r include=FALSE}
 # Load packages
-pacman::p_load(pacman, tidyverse, kableExtra, psych, lavaan, corrplot, performance, MVN, ICS,
-               dplyr,matrixStats, semPlot, gridExtra,knitr, readxl, papaja, report, mice, VIM,
-               rmarkdown, janitor)
-```
+pacman::p_load(pacman, tidyverse, kableExtra, psych, corrplot, performance, MVN, ICS,
+               dplyr, gridExtra, knitr, readxl, papaja, mice, VIM, janitor)
 
-# read all data
-```{r read raw data}
+# read raw data
 raw_data <- read_excel("Coded_data.xlsx")
-```
 
-
-```{r change variable name}
 # Change variable names
 df_adjr <- rename(raw_data, # adjust raw data frame (df_adjr) for analyses
                    "duration" = "Duration(Second)", # in seconds
@@ -31,24 +20,17 @@ columns = c("id", "Platform", "consent","duration", "Age","gender", "Edu", "SES"
 demographics <- subset(df_adjr, select = columns) 
 df_adjr <- df_adjr[ , ! names(df_adjr) %in% columns]
 df_adjr <- cbind(demographics, df_adjr)
-```
 
-# RAW Demographics summary
-```{r summary raw data}
+
+# summary raw data
 describe(df_adjr)
-```
 
-# Missing data before imputation
-```{r visualise missing}
 # visualise missing data
 mice_plot <- aggr(df_adjr,numbers=TRUE, sortVars=TRUE,
                     labels=names(df_adjr), cex.axis=.7,
                     gap=3, ylab=c("Missing data","Pattern"))
-```
 
-# IMPUTATION
-- exclude individuals with more than five percent missing data.
-```{r exclusion}
+# exclusion criteria
 # Percentage of missing data per row
 temp_no_missing <- df_adjr
 percent_missing <- function(x){sum(is.na(x)/length(x)*100)}
@@ -64,16 +46,14 @@ missing <- apply(replace_rows[,-c(1:7)], 2, percent_missing)
 table(missing)
 replace_columns <- replace_rows[,-c(1:7)] %>% select_if(missing<=5)
 no_columns <- replace_rows[,-c(8:69)]
-```
 
-```{r Describe data}
+# Describe data
 temp_data <- cbind(no_columns, replace_columns)
 describe(temp_data[,c(1:8)])
-```
 
-```{r Imputation function}
+# Imputation function
 function_data_imputation <- function(replace_columns, no_columns){  #IMPUTE DATA
-  tempnomiss <- mice(replace_columns, print=FALSE) #Mice easily imputes, taking into account data type.
+  tempnomiss <- mice(replace_columns, print=FALSE)
   
   imputed_columns <- complete(tempnomiss) # Get all the imputed data
   
@@ -81,32 +61,19 @@ function_data_imputation <- function(replace_columns, no_columns){  #IMPUTE DATA
   
   return(clean_data)
 }
-```
 
-```{r Impute data, eval=TRUE}
+# Impute data
 clean_data <- function_data_imputation(replace_columns, no_columns) # Run the data imputation function or the replication criteria for exclusion
-write.csv(clean_data, "Imputed_data.csv", row.names = F) # Save imputed data to csv
-```
 
-# Imputed data summary
-```{r}
 describe(clean_data)
-```
 
-# Missing data after imputation
-```{r visualise missing after imputation}
+# visualise missing after imputation
 mice_plot <- aggr(clean_data,numbers=TRUE, sortVars=TRUE,
                   labels=colnames(clean_data), cex.axis=1,
                   gap=1, ylab=c("Missing data","Pattern"))
-```
 
-# Outliers
-**Outliers Mahalanobis**
-- Degrees of freedom in this case is based on the nr of variables (columns)
-- Detect outliers based on **unscored** data
-```{r Mahalnobis} 
-# Mahalanobis for unscored data
-mahal <- mahalanobis(clean_data[ , -c(1:7)],
+# identify outliers based on Mahalanobis distance
+mahal <- mahalanobis(clean_data[ , -c(1:7)], # Mahalanobis for unscored data
   colMeans(clean_data[ , -c(1:7)], na.rm=TRUE),
   cov(clean_data[ , -c(1:7)], use ="pairwise.complete.obs"))
 
@@ -114,27 +81,17 @@ cutoff <- qchisq(p = 1 - .001, #1 minus alpha
                  df = ncol(clean_data[ , -c(1:7)])) # number of columns
 
 cutoff # mahalanobis cutoff score
-```
 
-```{r drop outliers based on MD}
 # Drop all outliers detected based on *unscored* data
 summary(mahal < cutoff) #notice the direction 
 no_outlier <- subset(clean_data, mahal < cutoff)
-```
 
-# No outlier data summary
-```{r summary no outlier}
+# Summarise
 describe(no_outlier)
-```
 
-```{r check for duplicates}
 # Check for duplicates
 sum(duplicated(no_outlier))
-```
 
-# Score data
-- Prepare to score the data with no outliers
-```{r MCQ sub-scales}
 # Create MCQ subscale variable groups
 mcq_pos <- c("MCQ1","MCQ7","MCQ10",
              "MCQ19","MCQ23","MCQ28")
@@ -150,9 +107,7 @@ mcq_nc <- c("MCQ6","MCQ13","MCQ20",
 
 mcq_csc <- c("MCQ3","MCQ5","MCQ12",
              "MCQ16","MCQ18","MCQ30")
-```
 
-```{r Function to score data}
 # Function to Score data
 function_score_data <-function(no_outlier){
 
@@ -180,88 +135,62 @@ function_score_data <-function(no_outlier){
   
   return(scored_data)
 }
-```
 
-```{r Run Score data FUN}
+# Run Score data FUN
 scored_data <- function_score_data(no_outlier) # Score the data with no outliers
-```
 
-# Interaction terms
-```{r}
-scored_data <- read.csv("/Users/Pinocchio/R/Thesis_git_repository/Data_analysis/Data/C_Imp_scored2.csv")
-# Create interaction terms
 
+# Rename data for modelling ease in lavaan
 scored_data <- scored_data %>% mutate(rename(scored_data,
                                       "X" = "mean_cra",
                                       "Y" = "sum_cesd",
                                       "W" = "SES",
                                       "Z" = "mean_bsm",
-                                      "COV" = "mean_pss",
-                                      "M" = "sum_neg"))
+                                      "COV" = "mean_pss"))
 
+# Create interaction terms
 scored_data <- scored_data %>% mutate(X.W = X * W,
                                X.Z = X * Z,
                                W.Z = W * Z,
-                               X.W.Z = X * W * Z,
-                               M.W = M * W,
-                               M.Z = M * Z,
-                               M.W.Z = M * W * Z)
-```
+                               X.W.Z = X * W * Z)
 
-```{r Save data to csv, echo=TRUE}
-write.csv(scored_data, "scored_data_imputed_2.csv", row.names = FALSE) # Save scored data in a csv file
-```
+# Save scored data to csv
+write.csv(scored_data, "SEM_data_imputed.csv", row.names = FALSE)
 
-# Summary of cleaned data and scored data
-```{r summary scored data}
-describe(scored_data[,-c(8:69)]) # Missing Data & outliers checked
-```
+# summary of  scored data
+describe(scored_data[,-c(1:80)]) # Missing Data & outliers checked
 
-# Assumptions: Additivity
-```{r correlation plot}
-plot_data <- cbind(scored_data["SES"],scored_data[ , -c(1:69)])
+# correlation plot
+plot_data <- cbind(scored_data["SES"],scored_data[ , c(70:80)])
 corPlot(cor(plot_data), upper = F)
-```
 
-# Assumption: Multivariate Normality
-```{r normality test}
+# normality test
 mvntest_result <- mvn(scored_data[8:69], mvnTest = "hz")
 mvntest_result$multivariateNormality
-```
-# Assumption: Kurtosis
-```{r Kurtosis test}
+
+# Kurtosis test
 mvnorm.kur.test(scored_data[8:69], method = "simulation")
-```
 
-# Assumption: Skewness
-```{r Skewness test}
+# Skewness test
 mvnorm.skew.test(scored_data[8:69])
-```
 
-# Frequency tables
-```{r Gender}
+# Demographics
 # Gender
 gender_freq <- scored_data %>% tabyl(gender)
 levels(gender_freq$gender) <- c("male","female", "non-binary", "DWA")
 apa_table(gender_freq, caption = "Proportions of Gender")
-```
 
-```{r Education}
 # Education
 edu_freq <- scored_data %>% tabyl(Edu)
 levels(edu_freq$Edu) <- c("Elementary or lower","Highschool Diploma", "Bachelor's", "Master's", "PhD or higher")
 apa_table(edu_freq, caption = "Proportions of Education level")
-```
 
-# Descriptives
-- In the first step, the data are summarized to get the descriptive statistics.
-- Subsequently, the data are reformatted.
-```{r Descriptives}
+# Compute Descriptives
 descriptives <- scored_data %>% 
-  dplyr::summarize(across(c(SES, Age, mean_cra, mean_hcru,sum_cesd, 
+  summarize(across(c(SES, Age, mean_cra, mean_hcru,sum_cesd, 
                             mean_pss, mean_bsm, sum_pos,sum_neg, 
                             sum_cc, sum_nc, sum_csc, sum_MCQ),
-                          list(mean = mean, sd = sd, min = min, max = max)), na.rm=TRUE) %>%
+                          list(mean = mean, sd = sd, min = min, max = max)), na.rm= T) %>%
   
   # bring everything in long format
   pivot_longer(everything(), names_to = "name") %>%
@@ -285,15 +214,11 @@ descriptives <- scored_data %>%
          NC = sum_nc, #
          CSC = sum_csc, #
          MCQT = sum_MCQ) # MCQ =Meta Cognitions Questionnaire Total
-```
 
-# Cronbach’s alphas
-- Select the items from the *raw* or *un-scored* data that belong to the specific scale.
-- calculate alpha and extract raw_alpha from the list the alpha function generates.
-```{r Chronbacks alphas}
 # Calculate cronbach’s alphas
 alpha <- scored_data %>%
   dplyr::summarize(
+    
     # Replication Block Alphas
     cra_alpha = select(.,starts_with("CRA")) %>% psych::alpha() %>%
       pluck("total", "raw_alpha"), # extract total and then raw_alpha from list
@@ -304,7 +229,7 @@ alpha <- scored_data %>%
     pss_alpha = select(.,starts_with("PSS")) %>% psych::alpha(check.keys=TRUE) %>%
       pluck("total", "raw_alpha"),
     
-    # BSM Alphas
+    # BSM Alpha
     BSM_alpha = select(.,starts_with("BSM")) %>% psych::alpha(check.keys=TRUE) %>%
       pluck("total", "raw_alpha"),
     
@@ -321,26 +246,18 @@ alpha <- scored_data %>%
       pluck("total", "raw_alpha"),
     mcq_alpha = select(.,all_of(mcq_csc)) %>% psych::alpha() %>%
       pluck("total", "raw_alpha"))
-```
 
-```{r Descriptives2}
 # add alphas as extra row to the descriptives table
 descriptives <- descriptives %>%
-  add_row(Summary = "alpha", SES = NA, CRA = alpha$cra_alpha, HCRU = alpha$hcru_alpha,
+  add_row(Summary = "alpha", SES = NA, Age = NA, CRA = alpha$cra_alpha, HCRU = alpha$hcru_alpha,
           PSS = alpha$pss_alpha, CESD = alpha$cesd_alpha, BSM = alpha$BSM_alpha, 
           POS = alpha$pos_alpha, NEG = alpha$neg_alpha, CC = alpha$cc_alpha,
           NC = alpha$nc_alpha, CSC = alpha$csc_alpha, MCQT = alpha$mcq_alpha)
-```
 
 # Descriptives table
-```{r Descriptives table}
-# Make a nicely formatted table
 apa_table(descriptives) # is only shown when RMarkdown document is knitted
-```
 
-# Plot monthly family income
-```{r income plot}
+# income plot
 income_plot<-hist(scored_data$SES,
                   main="Family income distribution",
                   xlab="family income category")
-```
