@@ -8,10 +8,41 @@ set.seed(79)
 # Load packages
 pacman::p_load(pacman, tidyverse, psych, lavaan, dplyr, semPlot, readxl, rmarkdown)
 
+data_path = "scored_data"
 # Read data
-analyze_data <- read_csv("/Users/Pinocchio/R/Thesis_git_repository/Data_analysis/Data/C_Imp_scored.csv")
+scored_data <- read_csv(data_path)
 
-describe(cbind(analyze_data[,5:8],analyze_data[,70:89]))
+describe(data[,-c(1:69)])
+
+# mean centre independent and moderator for interaction terms
+centred_data <- scored_data %>%
+  mutate(cra_c = scale(mean_cra, center = TRUE, scale = FALSE),
+         ses_c = scale(SES, center = TRUE, scale = FALSE),
+         bsm_c = scale(mean_bsm, center = TRUE, scale = FALSE),
+         neg_c = scale(sum_neg, center = TRUE, scale = FALSE))
+
+
+df <- cbind(centred_data["SES"],centred_data[ , c(70:83)])
+
+# Rename data for modelling ease in lavaan
+df <- df %>% mutate(rename(df,
+                           "X" = "cra_c",
+                           "Y" = "sum_cesd",
+                           "W" = "ses_c",
+                           "Z" = "bsm_c",
+                           "COV" = "mean_pss",
+                           "M" = "neg_c"))
+
+# Create interaction terms
+df <- df %>% mutate(X.W = X * W,
+                    X.Z = X * Z,
+                    W.Z = W * Z,
+                    X.W.Z = X * W * Z,
+                    M.W = M * W,
+                    M.Z = M* Z,
+                    M.W.Z = M * W * Z)
+
+write.csv(df,"SEM_ready.csv")
 
 # Variables guide
 
@@ -34,17 +65,22 @@ describe(cbind(analyze_data[,5:8],analyze_data[,70:89]))
 # X.W, X.Z, ....: are interaction terms
 # COV: covariate // Life stress (PSS)
 # All variables are manifest and continuous.
-# Model base on Hayes (2013), model 19 (page24)
+
+# Model based on Hayes (2013), model 19 (page24)
 # http://dm.darden.virginia.edu/ResearchMethods/Templates.pdf
 
+# Algebra based on: Stride C.B., Gardner S., Catley. N. & Thomas, F.(2015) 'Mplus code for the mediation, moderation, and moderated mediation model templates from Andrew Hayes' PROCESS analysis examples' , http://www.figureitout.org.uk
+
+# Y = b0 + b1M + b2MV + b3MQ + b4MVQ + c1'X + c2'V + c3'Q + c4'XV + c5'XQ + c6'VQ + c7'XVQ
+# M = a0 + a1X
 
 # Lavaan Syntax including conditional effects
-Mod.Med.Model1 <- "
+Mod.Med.Model <- "
 # Mediator
-sum_neg ~  a*X + b2*W + b3*Z + b4*W.Z + d1*COV 
+M ~ a*X
 
 # Outcome being predicted by the model
-Y ~ c1 * X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z + b1*sum_neg + d*COV
+Y ~ c1 * X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z + b1*M + b2*M.W + b3*M.Z + b4*M.W.Z
 
 # Effects
 indirect := a * (b1 + b2 + b3 + b4)
@@ -75,31 +111,7 @@ direct.HwHz:= c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7 * 
 "
 Mod.Med.fit1 <- sem(model = Mod.Med.Model1,
                        meanstructure = TRUE,
-                       data = analyze_data,
-                       se = "bootstrap",
-                       meanstructure = TRUE,
-                       bootstrap = 1000)
-
-# Lavaan Syntax excluding conditional effects
-Mod.Med.Model2 <-
-"
-# Mediator
-sum_neg ~  a*X + b2*W + b3*Z + b4*W.Z + d1*COV 
-
-# Outcome being predicted by the model
-Y ~ c1 * X + c2*W + c3*Z + c4*X.W + c5*X.Z + c6*W.Z + c7*X.W.Z + b1*sum_neg + d*COV
-
-# Effects
-indirect := a * (b1 + b2 + b3 + b4)
-direct:= c1 + c4 + c5 + c7
-
-# Total effect
-total := direct + indirect
-"
-
-Mod.Med.fit2 <- sem(model = Mod.Med.Model2,
-                       meanstructure = TRUE,
-                       data = analyze_data,
+                       data = df,
                        se = "bootstrap",
                        meanstructure = TRUE,
                        bootstrap = 1000)
@@ -108,7 +120,7 @@ Mod.Med.fit2 <- sem(model = Mod.Med.Model2,
 summary(Mod.Med.fit1, fit.measures = TRUE, standardize = TRUE, rsquare = TRUE)
 
 # Parameter estimates
-parameterEstimates(Mod.Med.fit1, remove.nonfree = TRUE, ci = TRUE, 
+parameterEstimates(Mod.Med.fitc, remove.nonfree = TRUE, ci = TRUE, 
                    boot.ci.type = "perc", pvalue = TRUE, output = "pretty")
 
 # Model plot
