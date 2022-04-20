@@ -1,5 +1,5 @@
 ---
-title: "Replication of the data analysis in Study1 by Troy et al. (2017) with an Iranian sample."
+title: "A. Replication of the data analysis in Study1 by Troy et al. (2017) with an Iranian sample."
 author: "Alimohammad Soufizadeh"
 date: "March, 2022"
 ---

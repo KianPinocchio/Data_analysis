@@ -9,7 +9,7 @@ pacman::p_load(pacman, tidyverse, kableExtra, psych, corrplot, performance, MVN,
                dplyr, gridExtra, knitr, readxl, papaja, mice, VIM, janitor)
 
 # read raw data
-raw_data <- read_excel("Coded_data.xlsx")
+raw_data <- read_excel("/Users/Pinocchio/R/Thesis_git_repository/Data_analysis/Data/Coded_data.xlsx")
 
 # Change variable names
 df_adjr <- rename(raw_data, # adjust raw data frame (df_adjr) for analyses
@@ -130,8 +130,7 @@ function_score_data <-function(no_outlier){
          sum_neg = rowSums(select(.,all_of(mcq_neg))),
          sum_cc = rowSums(select(.,all_of(mcq_cc))),
          sum_nc = rowSums(select(.,all_of(mcq_nc))),
-         sum_csc = rowSums(select(.,all_of(mcq_csc))),
-         sum_MCQ = rowSums(select(.,starts_with("MCQ"))))%>%
+         sum_csc = rowSums(select(.,all_of(mcq_csc))))%>%
   
   return(scored_data)
 }
@@ -139,26 +138,11 @@ function_score_data <-function(no_outlier){
 # Run Score data FUN
 scored_data <- function_score_data(no_outlier) # Score the data with no outliers
 
-
-# Rename data for modelling ease in lavaan
-scored_data <- scored_data %>% mutate(rename(scored_data,
-                                      "X" = "mean_cra",
-                                      "Y" = "sum_cesd",
-                                      "W" = "SES",
-                                      "Z" = "mean_bsm",
-                                      "COV" = "mean_pss"))
-
-# Create interaction terms
-scored_data <- scored_data %>% mutate(X.W = X * W,
-                               X.Z = X * Z,
-                               W.Z = W * Z,
-                               X.W.Z = X * W * Z)
-
 # Save scored data to csv
 write.csv(scored_data, "SEM_data_imputed.csv", row.names = FALSE)
 
 # summary of  scored data
-describe(scored_data[,-c(1:80)]) # Missing Data & outliers checked
+describe(scored_data[,-c(1:69)]) # Missing Data & outliers checked
 
 # correlation plot
 plot_data <- cbind(scored_data["SES"],scored_data[ , c(70:80)])

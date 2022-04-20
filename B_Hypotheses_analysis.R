@@ -1,5 +1,5 @@
 
-# title: "Replication of the data analysis in Study1 by Troy et al. (2017) with an Iranian sample."
+# title: "Data analysis examining hypotheses B1 and B2 of the study: The interplay of cognitive reappraisal ability, socioeconomic status and mental health."
 # author: "Alimohammad Soufizadeh"
 # date: "March, 2022"
 

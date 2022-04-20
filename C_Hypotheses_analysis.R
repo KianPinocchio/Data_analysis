@@ -1,6 +1,6 @@
 
-# Topic: Structural equation modelling for CREP-21-29
-# Date: 
+# Topic: C. Structural equation modelling for CREP-21-29
+# Date: April, 2022
 
 # Set seed
 set.seed(79)
@@ -12,17 +12,17 @@ data_path = "scored_data"
 # Read data
 scored_data <- read_csv(data_path)
 
-describe(data[,-c(1:69)])
+describe(scored_data[,-c(1:69)])
 
 # mean centre independent and moderator for interaction terms
 centred_data <- scored_data %>%
   mutate(cra_c = scale(mean_cra, center = TRUE, scale = FALSE),
          ses_c = scale(SES, center = TRUE, scale = FALSE),
          bsm_c = scale(mean_bsm, center = TRUE, scale = FALSE),
-         neg_c = scale(sum_neg, center = TRUE, scale = FALSE))
+         csc_c = scale(sum_csc, center = TRUE, scale = FALSE))
 
 
-df <- cbind(centred_data["SES"],centred_data[ , c(70:83)])
+df <- cbind(centred_data["SES"],centred_data[ , c(70:84)])
 
 # Rename data for modelling ease in lavaan
 df <- df %>% mutate(rename(df,
@@ -31,7 +31,7 @@ df <- df %>% mutate(rename(df,
                            "W" = "ses_c",
                            "Z" = "bsm_c",
                            "COV" = "mean_pss",
-                           "M" = "neg_c"))
+                           "M" = "csc_c"))
 
 # Create interaction terms
 df <- df %>% mutate(X.W = X * W,
@@ -109,25 +109,24 @@ direct.LwHz:= c1 + c4*(W.mean - sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7 * 
 direct.HwLz:= c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean - sqrt(Z.var)) + c7 * (W.mean + sqrt(W.var)) * (Z.mean - sqrt(Z.var))
 direct.HwHz:= c1 + c4*(W.mean + sqrt(W.var)) + c5*(Z.mean + sqrt(Z.var)) + c7 * (W.mean + sqrt(W.var)) * (Z.mean + sqrt(Z.var))
 "
-Mod.Med.fit1 <- sem(model = Mod.Med.Model1,
+Mod.Med.fit <- sem(model = Mod.Med.Model,
                        meanstructure = TRUE,
                        data = df,
                        se = "bootstrap",
-                       meanstructure = TRUE,
                        bootstrap = 1000)
 
 # Summary
-summary(Mod.Med.fit1, fit.measures = TRUE, standardize = TRUE, rsquare = TRUE)
+summary(Mod.Med.fit, fit.measures = TRUE, standardize = TRUE, rsquare = TRUE)
 
 # Parameter estimates
-parameterEstimates(Mod.Med.fitc, remove.nonfree = TRUE, ci = TRUE, 
+parameterEstimates(Mod.Med.fit, remove.nonfree = TRUE, ci = TRUE, 
                    boot.ci.type = "perc", pvalue = TRUE, output = "pretty")
 
 # Model plot
-plot = semPaths(Mod.Med.fit1, fixedStyle = 2, layout = "tree2", whatLabels = "est",
+plot = semPaths(Mod.Med.fit, fixedStyle = 2, layout = "tree2", whatLabels = "est",
                 intercepts = F, label.scale=T, nCharNodes = 4,
                 sizeMan2=4, sizeMan=4.5, asize=1.5, residuals = T, exoCov = F)
 
 # probed Covariances table
-cov_table <- data.frame(vcov(Mod.Med.fit1))
-write.csv(cov_table , "C_imp_neg_cov.csv", row.names = T) # Save covariance matrix
+cov_table <- data.frame(fitted(Mod.Med.fit.pos))
+write.csv(cov_table , "cov_matrix.pos.csv", row.names = T) # Save covariance matrix
